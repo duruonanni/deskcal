@@ -11,7 +11,6 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     App, AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewWindow, WindowEvent,
 };
-use tauri::window::{Color, Effect, EffectsBuilder};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 use crate::db;
@@ -306,23 +305,6 @@ pub fn setup_widget_geometry_persistence(app: &AppHandle) -> Result<(), String> 
     Ok(())
 }
 
-pub fn try_apply_widget_effects(window: &WebviewWindow) {
-    let attempts = [
-        EffectsBuilder::new().effect(Effect::Mica).build(),
-        EffectsBuilder::new()
-            .effect(Effect::Acrylic)
-            .color(Color(255, 255, 255, 64))
-            .build(),
-        EffectsBuilder::new().effect(Effect::Acrylic).build(),
-    ];
-
-    for effects in attempts {
-        if window.set_effects(Some(effects)).is_ok() {
-            return;
-        }
-    }
-}
-
 pub fn show_widget(app: &AppHandle) -> Result<(), String> {
     let window = app
         .get_webview_window(WIDGET_LABEL)
@@ -491,10 +473,6 @@ pub fn setup_global_shortcut(app: &App) -> Result<(), Box<dyn std::error::Error>
 }
 
 pub fn setup_windows_shell(app: &App) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window(WIDGET_LABEL) {
-        try_apply_widget_effects(&window);
-    }
-
     let locale = {
         let state = app.state::<AppState>();
         state
