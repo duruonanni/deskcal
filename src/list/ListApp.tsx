@@ -7,6 +7,7 @@ import {
   itemsListIncomplete,
   onItemsChanged,
   onSettingsChanged,
+  setCurrentWindowTitle,
   settingsGet,
 } from "../services/tauriCommands";
 import { documentLang, t } from "../i18n/messages";
@@ -31,6 +32,10 @@ export default function ListApp() {
 
   useEffect(() => {
     document.documentElement.lang = documentLang(locale);
+  }, [locale]);
+
+  useEffect(() => {
+    void setCurrentWindowTitle(t(locale, "incompleteTitle"));
   }, [locale]);
 
   useEffect(() => {

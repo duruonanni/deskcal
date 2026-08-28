@@ -118,6 +118,10 @@ export async function widgetStartDragging(): Promise<void> {
   await getCurrentWindow().startDragging();
 }
 
+export async function setCurrentWindowTitle(title: string): Promise<void> {
+  await getCurrentWindow().setTitle(title);
+}
+
 export function isDragExcludedTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return true;
   return Boolean(

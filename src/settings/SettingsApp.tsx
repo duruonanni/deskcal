@@ -3,6 +3,7 @@ import {
   aiRun,
   DEFAULT_UI_SETTINGS,
   onSettingsChanged,
+  setCurrentWindowTitle,
   settingsGet,
   settingsSet,
   syncExport,
@@ -17,10 +18,14 @@ export default function SettingsApp() {
   const [error, setError] = useState<string | null>(null);
   const [stubMessage, setStubMessage] = useState<string | null>(null);
   const locale = settings.locale ?? "zh";
-  useDeskCalTheme(settings);
+  const { packInvalid } = useDeskCalTheme(settings);
 
   useEffect(() => {
     document.documentElement.lang = documentLang(locale);
+  }, [locale]);
+
+  useEffect(() => {
+    void setCurrentWindowTitle(t(locale, "settingsTitle"));
   }, [locale]);
 
   useEffect(() => {
@@ -88,12 +93,29 @@ export default function SettingsApp() {
 
       <section className="settings-section">
         <h2>{t(locale, "appearance")}</h2>
+        {packInvalid && (
+          <p role="alert">{t(locale, "customThemeInvalid")}</p>
+        )}
+        <div className="settings-row">
+          <span>{t(locale, "themeModeLabel")}</span>
+          {(["auto", "light", "dark"] as const).map((code) => (
+            <button
+              key={code}
+              type="button"
+              className={`widget-btn${settings.themeMode === code ? " widget-btn--active" : ""}`}
+              aria-pressed={settings.themeMode === code}
+              onClick={() => void persist({ ...settings, themeMode: code })}
+            >
+              {t(locale, code === "auto" ? "themeAuto" : code === "light" ? "themeLight" : "themeDark")}
+            </button>
+          ))}
+        </div>
         <label className="settings-row">
           <span>{t(locale, "opacity")}</span>
           <input
             type="range"
-            min={0.35}
-            max={1}
+            min={0.1}
+            max={0.4}
             step={0.01}
             value={settings.widgetOpacity}
             onChange={(e) =>
@@ -105,6 +127,7 @@ export default function SettingsApp() {
           />
           <span>{Math.round(settings.widgetOpacity * 100)}%</span>
         </label>
+        <p>{t(locale, "opacityHelp")}</p>
         <label className="settings-row">
           <input
             type="checkbox"
