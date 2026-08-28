@@ -42,6 +42,13 @@
 - **decision:** Drag uses `startDragging()` on unlocked empty areas; lock is `widgetLocked` in settings plus a header toggle. First launch after this change places the widget at the primary monitor top-right (one-time kv `placed_top_right_v1`). Default `showTitlesInCells` is on; cells list up to 4 numbered titles. UI locale `zh` | `en` is global (widget, settings, list, tray).
 - **consequence:** Existing installs relocate once to top-right. After the user drags, position is saved again. Locking prevents drag but not resize.
 
+## 2026-08-28 — Editorial glass visual language
+
+- **status:** accepted (spec pending owner file review)
+- **context:** V0 chrome looked generic; opacity did not show the desktop; owner wants light/dark of one language, true tinted glass, Win8-style hot tiles, bilingual chrome, and a token contract for later custom themes.
+- **decision:** Implement `docs/superpowers/specs/2026-08-28-ui-visual-language-design.md`. CSS tokens + `themeMode` auto/light/dark; editorial light/dark; fill alpha 0.10–0.40 default 0.25; no widget `backdrop-filter`; today/rest/work as opaque tiles; custom pack load from `themes/custom.json` with no customizer UI. Default `showTitlesInCells` off. Locale remains `zh` | `en` for all new strings.
+- **consequence:** Widget wallpaper, memorial cards, and customizer UI are follow-ups. Click-to-expand stays with the other session. WorkerW stays out of V0.
+
 ## Open (not yet decided)
 
 - Public GitHub remote name and whether the first remote is private.

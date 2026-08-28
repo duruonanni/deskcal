@@ -4,7 +4,7 @@
 
 - **project:** DeskCal (桌历)
 - **status:** V0 implemented locally (not committed, no GitHub remote)
-- **current focus:** Owner smoke: drag/lock, top-right default, in-cell tasks, zh/en in Settings
+- **current focus:** Owner reviewing visual-language spec; do not implement until that review passes, then writing-plans
 
 ## What Changed
 
@@ -23,18 +23,21 @@
 
 ## Open Items
 
+- Owner review: `docs/superpowers/specs/2026-08-28-ui-visual-language-design.md` (editorial glass, true transparency, zh/en). After approval, writing-plans then implement. Do not start UI code in this brainstorm session.
+- Follow-ups (not that spec): widget wallpaper + wallpaper opacity; memorial cards; customizer UI.
 - Owner visual smoke: drag widget, add a task, reboot persistence, tray toggle, hotkey.
 - SmartScreen / code signing for public GitHub releases.
 - V0.5: recurrence / due_at; V1: BYOK AI + folder snapshot.
 
 ## Recommended Next Step
 
-1. Run `npm run tauri dev` and click through the widget.
-2. When ready to measure installer size: `npm run tauri -- build` and inspect `src-tauri/target/release/bundle/nsis/`.
-3. If happy, ask to `git commit` and optionally create a GitHub repo.
+1. Review the visual-language spec; request edits or approve for an implementation plan.
+2. Run `npm run tauri dev` for current V0 smoke if needed.
+3. When ready to measure installer size: `npm run tauri -- build` and inspect `src-tauri/target/release/bundle/nsis/`.
 
 ## Useful References
 
+- `docs/superpowers/specs/2026-08-28-ui-visual-language-design.md`
 - `DECISIONS.md`
 - `data/cn-holidays.json` (国务院 2025/2026 放假调休)
 - `npm test` / `cd src-tauri; cargo test`
