@@ -1,6 +1,6 @@
 # DeskCal UI visual language (editorial glass)
 
-Status: draft pending owner review  
+Status: implemented on feature/editorial-glass-ui; pending owner visual smoke  
 Date: 2026-08-28  
 Project: DeskCal (桌历)
 
