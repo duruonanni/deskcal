@@ -79,12 +79,20 @@ export default function MonthGrid({
                     : null,
               ].filter(Boolean);
 
+              const tileKind = isToday
+                ? "today"
+                : mark?.kind === "rest"
+                  ? "rest"
+                  : mark?.kind === "work"
+                    ? "work"
+                    : null;
+
               const cellClass = [
                 "day-cell",
                 isOtherMonth && "day-cell--other",
-                isToday && "day-cell--today",
-                isSelected && "day-cell--selected",
                 isWeekend && "day-cell--weekend",
+                isSelected && "day-cell--selected",
+                tileKind && `day-cell--tile-${tileKind}`,
               ]
                 .filter(Boolean)
                 .join(" ");
@@ -109,7 +117,9 @@ export default function MonthGrid({
                         className={`day-cell-mark day-cell-mark--${mark.kind}`}
                         aria-hidden="true"
                       >
-                        {mark.kind === "rest" ? (locale === "en" ? "Off" : "休") : locale === "en" ? "Work" : "班"}
+                        {mark.kind === "rest"
+                          ? t(locale, "restMark")
+                          : t(locale, "workMark")}
                       </span>
                     )}
                   </span>
@@ -127,7 +137,7 @@ export default function MonthGrid({
                       )}
                     </span>
                   ) : (
-                    hasDot && <span className="day-cell-dot" aria-hidden="true" />
+                    hasDot && <span className="day-cell-bar" aria-hidden="true" />
                   )}
                 </button>
               );
