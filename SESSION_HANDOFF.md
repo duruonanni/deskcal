@@ -4,7 +4,7 @@
 
 - **project:** DeskCal (桌历)
 - **status:** V0 implemented locally (not committed, no GitHub remote)
-- **current focus:** Owner reviewing visual-language spec; do not implement until that review passes, then writing-plans
+- **current focus:** Editorial glass plan ready; implement via Composer subagents (`docs/superpowers/plans/2026-08-28-editorial-glass-ui.md`)
 
 ## What Changed
 
@@ -23,7 +23,7 @@
 
 ## Open Items
 
-- Owner review: `docs/superpowers/specs/2026-08-28-ui-visual-language-design.md` (editorial glass, true transparency, zh/en). After approval, writing-plans then implement. Do not start UI code in this brainstorm session.
+- Owner review: spec approved. Plan: `docs/superpowers/plans/2026-08-28-editorial-glass-ui.md`. Dispatch Composer (`composer-2.5-fast`) one task at a time.
 - Follow-ups (not that spec): widget wallpaper + wallpaper opacity; memorial cards; customizer UI.
 - Owner visual smoke: drag widget, add a task, reboot persistence, tray toggle, hotkey.
 - SmartScreen / code signing for public GitHub releases.
