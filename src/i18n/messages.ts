@@ -50,7 +50,15 @@ export type MessageKey =
   | "restDay"
   | "workDay"
   | "monthGridAria"
-  | "dragHint";
+  | "dragHint"
+  | "themeModeLabel"
+  | "themeAuto"
+  | "themeLight"
+  | "themeDark"
+  | "opacityHelp"
+  | "customThemeInvalid"
+  | "restMark"
+  | "workMark";
 
 const ZH: Record<MessageKey, string> = {
   appName: "桌历",
@@ -103,6 +111,14 @@ const ZH: Record<MessageKey, string> = {
   workDay: "调班",
   monthGridAria: "月历",
   dragHint: "解锁后可拖动",
+  themeModeLabel: "主题",
+  themeAuto: "跟随系统",
+  themeLight: "浅色",
+  themeDark: "深色",
+  opacityHelp: "越低越能看见桌面。",
+  customThemeInvalid: "自定义主题文件无效，已回落到编辑风。",
+  restMark: "休",
+  workMark: "班",
 };
 
 const EN: Record<MessageKey, string> = {
@@ -156,6 +172,14 @@ const EN: Record<MessageKey, string> = {
   workDay: "Work day",
   monthGridAria: "Month calendar",
   dragHint: "Unlock to drag",
+  themeModeLabel: "Theme",
+  themeAuto: "Follow system",
+  themeLight: "Light",
+  themeDark: "Dark",
+  opacityHelp: "Lower values show more of the desktop.",
+  customThemeInvalid: "Custom theme file is invalid; fell back to Editorial.",
+  restMark: "Off",
+  workMark: "Work",
 };
 
 const TABLES: Record<AppLocale, Record<MessageKey, string>> = { zh: ZH, en: EN };
