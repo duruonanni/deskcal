@@ -77,7 +77,16 @@ pub enum AppLocale {
     En,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ThemeMode {
+    #[default]
+    Auto,
+    Light,
+    Dark,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UiSettings {
     pub widget_opacity: f32,
@@ -87,11 +96,13 @@ pub struct UiSettings {
     pub locale: AppLocale,
     #[serde(default)]
     pub widget_locked: bool,
+    #[serde(default)]
+    pub theme_mode: ThemeMode,
 }
 
 impl UiSettings {
     pub fn clamped(mut self) -> Self {
-        self.widget_opacity = self.widget_opacity.clamp(0.35, 1.0);
+        self.widget_opacity = self.widget_opacity.clamp(0.10, 0.40);
         self
     }
 }
@@ -99,11 +110,34 @@ impl UiSettings {
 impl Default for UiSettings {
     fn default() -> Self {
         Self {
-            widget_opacity: 0.42,
-            show_titles_in_cells: true,
+            widget_opacity: 0.25,
+            show_titles_in_cells: false,
             text_outline: true,
             locale: AppLocale::Zh,
             widget_locked: false,
+            theme_mode: ThemeMode::Auto,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clamp_opacity_to_tinted_glass_range() {
+        let mut s = UiSettings::default();
+        s.widget_opacity = 0.05;
+        assert!((s.clamped().widget_opacity - 0.10).abs() < f32::EPSILON);
+        s.widget_opacity = 0.90;
+        assert!((s.clamped().widget_opacity - 0.40).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn defaults_match_editorial_glass() {
+        let s = UiSettings::default();
+        assert!((s.widget_opacity - 0.25).abs() < f32::EPSILON);
+        assert!(!s.show_titles_in_cells);
+        assert_eq!(s.theme_mode, ThemeMode::Auto);
     }
 }

@@ -81,9 +81,7 @@ fn migrate_ui_rev(conn: &Connection) -> Result<(), DbError> {
     if get_kv(conn, UI_REV_KEY)?.as_deref() == Some(UI_REV_CELL_TITLES) {
         return Ok(());
     }
-    let mut settings = get_ui_settings(conn)?;
-    settings.show_titles_in_cells = true;
-    set_ui_settings(conn, &settings)?;
+    let _ = get_ui_settings(conn)?;
     set_kv(conn, UI_REV_KEY, UI_REV_CELL_TITLES)?;
     Ok(())
 }
@@ -392,16 +390,16 @@ mod tests {
     fn ui_settings_default_then_roundtrip() {
         let (conn, _file) = open_test_db();
         let initial = get_ui_settings(&conn).expect("default settings");
-        assert!(initial.show_titles_in_cells);
+        assert!(!initial.show_titles_in_cells);
         assert!(!initial.widget_locked);
         let mut next = initial;
         next.show_titles_in_cells = false;
-        next.widget_opacity = 0.5;
+        next.widget_opacity = 0.3;
         next.widget_locked = true;
         set_ui_settings(&conn, &next).expect("save settings");
         let loaded = get_ui_settings(&conn).expect("load settings");
         assert!(!loaded.show_titles_in_cells);
         assert!(loaded.widget_locked);
-        assert!((loaded.widget_opacity - 0.5).abs() < f32::EPSILON);
+        assert!((loaded.widget_opacity - 0.3).abs() < f32::EPSILON);
     }
 }

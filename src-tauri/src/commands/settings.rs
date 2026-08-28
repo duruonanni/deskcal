@@ -11,7 +11,7 @@ fn db_err_to_string(err: DbError) -> String {
 #[tauri::command]
 pub fn settings_get(state: State<'_, AppState>) -> Result<UiSettings, String> {
     let conn = state.db.lock().map_err(|_| "database lock poisoned".to_string())?;
-    db::get_ui_settings(&conn).map_err(db_err_to_string)
+    Ok(db::get_ui_settings(&conn).map_err(db_err_to_string)?.clamped())
 }
 
 #[tauri::command]
