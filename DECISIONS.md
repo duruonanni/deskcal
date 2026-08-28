@@ -35,6 +35,13 @@
 - **decision:** Bundle target is NSIS only (`targets: "nsis"`). WebView2 uses `downloadBootstrapper` (silent); do not embed `offlineInstaller` or `fixedVersion`. NSIS uses LZMA and per-user install (`currentUser`).
 - **consequence:** Installer stays small on Win10/11. A machine without WebView2 needs network on first install. `npm run tauri -- build` writes `src-tauri/target/release/bundle/nsis/`. MSI is not produced.
 
+## 2026-08-28 — Drag, lock, top-right default, zh/en
+
+- **status:** accepted
+- **context:** Frameless WebView2 `data-tauri-drag-region` did not move the widget; default cell mode hid task titles; owner wants CalendarTask-like glass grid and bilingual chrome.
+- **decision:** Drag uses `startDragging()` on unlocked empty areas; lock is `widgetLocked` in settings plus a header toggle. First launch after this change places the widget at the primary monitor top-right (one-time kv `placed_top_right_v1`). Default `showTitlesInCells` is on; cells list up to 4 numbered titles. UI locale `zh` | `en` is global (widget, settings, list, tray).
+- **consequence:** Existing installs relocate once to top-right. After the user drags, position is saved again. Locking prevents drag but not resize.
+
 ## Open (not yet decided)
 
 - Public GitHub remote name and whether the first remote is private.

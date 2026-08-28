@@ -9,16 +9,22 @@ import {
   syncImport,
   type UiSettings,
 } from "../services/tauriCommands";
+import { documentLang, t, type AppLocale } from "../i18n/messages";
 
 export default function SettingsApp() {
   const [settings, setSettings] = useState<UiSettings>(DEFAULT_UI_SETTINGS);
   const [error, setError] = useState<string | null>(null);
   const [stubMessage, setStubMessage] = useState<string | null>(null);
+  const locale = settings.locale ?? "zh";
+
+  useEffect(() => {
+    document.documentElement.lang = documentLang(locale);
+  }, [locale]);
 
   useEffect(() => {
     void settingsGet()
       .then(setSettings)
-      .catch(() => setError("读取设置失败。"));
+      .catch(() => setError(t(locale, "readSettingsFailed")));
     let unlisten: (() => void) | undefined;
     void onSettingsChanged(setSettings).then((fn) => {
       unlisten = fn;
@@ -34,25 +40,27 @@ export default function SettingsApp() {
       setError(null);
       setSettings(await settingsSet(next));
     } catch {
-      setError("保存设置失败。");
+      setError(t(locale, "saveSettingsFailed"));
     }
   }
 
   async function tryStub(action: () => Promise<void>, label: string) {
     try {
       await action();
-      setStubMessage(`${label}：即将推出`);
+      setStubMessage(`${label}：${t(locale, "comingSoon")}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setStubMessage(
-        message.includes("not_implemented") ? `${label}：即将推出` : `${label}失败：${message}`,
+        message.includes("not_implemented")
+          ? `${label}：${t(locale, "comingSoon")}`
+          : `${label}${t(locale, "failedPrefix")}：${message}`,
       );
     }
   }
 
   return (
     <main className="app-shell">
-      <h1 className="app-title">设置</h1>
+      <h1 className="app-title">{t(locale, "settingsTitle")}</h1>
 
       {error && (
         <p className="widget-error" role="alert">
@@ -61,9 +69,25 @@ export default function SettingsApp() {
       )}
 
       <section className="settings-section">
-        <h2>外观</h2>
+        <h2>{t(locale, "language")}</h2>
+        <div className="settings-row">
+          {(["zh", "en"] as AppLocale[]).map((code) => (
+            <button
+              key={code}
+              type="button"
+              className={`widget-btn${settings.locale === code ? " widget-btn--active" : ""}`}
+              onClick={() => void persist({ ...settings, locale: code })}
+            >
+              {code === "zh" ? t(locale, "languageZh") : t(locale, "languageEn")}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <h2>{t(locale, "appearance")}</h2>
         <label className="settings-row">
-          <span>底板不透明度</span>
+          <span>{t(locale, "opacity")}</span>
           <input
             type="range"
             min={0.35}
@@ -84,15 +108,26 @@ export default function SettingsApp() {
             type="checkbox"
             checked={settings.textOutline}
             onChange={(e) =>
-              void persist({ ...settings, textOutline: e.target.checked })
+              void persist({ ...settings, textOutline: e.currentTarget.checked })
             }
           />
-          <span>文字描边（提高壁纸上的可读性）</span>
+          <span>{t(locale, "textOutline")}</span>
         </label>
+        <label className="settings-row">
+          <input
+            type="checkbox"
+            checked={settings.widgetLocked}
+            onChange={(e) =>
+              void persist({ ...settings, widgetLocked: e.currentTarget.checked })
+            }
+          />
+          <span>{t(locale, "lockWidget")}</span>
+        </label>
+        <p>{t(locale, "lockWidgetHelp")}</p>
       </section>
 
       <section className="settings-section">
-        <h2>日历</h2>
+        <h2>{t(locale, "calendar")}</h2>
         <label className="settings-row">
           <input
             type="checkbox"
@@ -100,44 +135,44 @@ export default function SettingsApp() {
             onChange={(e) =>
               void persist({
                 ...settings,
-                showTitlesInCells: e.target.checked,
+                showTitlesInCells: e.currentTarget.checked,
               })
             }
           />
-          <span>格内显示任务标题（最多 2 行）</span>
+          <span>{t(locale, "showTitlesInCells")}</span>
         </label>
-        <p>周起始为一；农历与休/班为离线数据。</p>
+        <p>{t(locale, "weekStartsMonday")}</p>
       </section>
 
       <section className="settings-section">
-        <h2>AI（即将推出）</h2>
-        <p>应用内填写 API Key 的分析助手尚未开放。核心日历不依赖网络。</p>
+        <h2>{t(locale, "aiSoonTitle")}</h2>
+        <p>{t(locale, "aiSoonBody")}</p>
         <button
           type="button"
           className="widget-btn"
-          onClick={() => void tryStub(aiRun, "AI")}
+          onClick={() => void tryStub(aiRun, t(locale, "tryAi"))}
         >
-          试用 AI
+          {t(locale, "tryAi")}
         </button>
       </section>
 
       <section className="settings-section">
-        <h2>数据同步（即将推出）</h2>
-        <p>自选 OneDrive / iCloud Drive 文件夹快照尚未开放。数据库不会放进网盘。</p>
+        <h2>{t(locale, "syncSoonTitle")}</h2>
+        <p>{t(locale, "syncSoonBody")}</p>
         <div className="settings-row">
           <button
             type="button"
             className="widget-btn"
-            onClick={() => void tryStub(syncExport, "导出快照")}
+            onClick={() => void tryStub(syncExport, t(locale, "exportSnapshot"))}
           >
-            导出快照
+            {t(locale, "exportSnapshot")}
           </button>
           <button
             type="button"
             className="widget-btn"
-            onClick={() => void tryStub(syncImport, "导入快照")}
+            onClick={() => void tryStub(syncImport, t(locale, "importSnapshot"))}
           >
-            导入快照
+            {t(locale, "importSnapshot")}
           </button>
         </div>
       </section>

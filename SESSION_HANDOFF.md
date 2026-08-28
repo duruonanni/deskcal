@@ -4,7 +4,7 @@
 
 - **project:** DeskCal (桌历)
 - **status:** V0 implemented locally (not committed, no GitHub remote)
-- **current focus:** Owner smoke test via `npm run tauri dev`; Windows release is NSIS-only (no embedded WebView2)
+- **current focus:** Owner smoke: drag/lock, top-right default, in-cell tasks, zh/en in Settings
 
 ## What Changed
 

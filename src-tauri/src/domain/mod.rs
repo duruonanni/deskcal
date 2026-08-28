@@ -69,12 +69,24 @@ pub struct ListRange {
     pub end: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum AppLocale {
+    #[default]
+    Zh,
+    En,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UiSettings {
     pub widget_opacity: f32,
     pub show_titles_in_cells: bool,
     pub text_outline: bool,
+    #[serde(default)]
+    pub locale: AppLocale,
+    #[serde(default)]
+    pub widget_locked: bool,
 }
 
 impl UiSettings {
@@ -87,9 +99,11 @@ impl UiSettings {
 impl Default for UiSettings {
     fn default() -> Self {
         Self {
-            widget_opacity: 0.78,
-            show_titles_in_cells: false,
+            widget_opacity: 0.42,
+            show_titles_in_cells: true,
             text_outline: true,
+            locale: AppLocale::Zh,
+            widget_locked: false,
         }
     }
 }

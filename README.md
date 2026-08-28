@@ -43,7 +43,7 @@ cd src-tauri; cargo test
 
 SQLite path: `%APPDATA%\dev.deskcal.app\app.db` — never put the live DB in OneDrive / iCloud Drive.
 
-Global hotkey: `Ctrl+Shift+C` captures to today. Tray left-click toggles the widget.
+- Global hotkey: `Ctrl+Shift+C` captures to today. Tray left-click toggles the widget. Header **锁定/解锁** (or Lock/Unlock) controls dragging; first launch after v0.1 layout sits at the **top-right**. Language is **设置 → 语言**.
 
 ## Structure
 

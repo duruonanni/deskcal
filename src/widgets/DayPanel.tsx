@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import type { CalendarItem } from "../services/tauriCommands";
+import type { AppLocale } from "../i18n/messages";
+import { t } from "../i18n/messages";
 import { dayPanelTitle, parseDay } from "./calendarUtils";
 import { dayPanelCultureLine } from "./dayCulture";
 
 interface DayPanelProps {
   day: string;
   items: CalendarItem[];
+  locale: AppLocale;
   focusCapture: boolean;
   onFocusCaptureDone: () => void;
   onCreate: (title: string) => Promise<void>;
@@ -25,6 +28,7 @@ function sortItems(items: CalendarItem[]): CalendarItem[] {
 export default function DayPanel({
   day,
   items,
+  locale,
   focusCapture,
   onFocusCaptureDone,
   onCreate,
@@ -35,7 +39,7 @@ export default function DayPanel({
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const sorted = sortItems(items);
-  const cultureLine = dayPanelCultureLine(day, parseDay(day));
+  const cultureLine = dayPanelCultureLine(day, parseDay(day), locale);
 
   useEffect(() => {
     if (focusCapture) {
@@ -59,9 +63,9 @@ export default function DayPanel({
   }
 
   return (
-    <section className="day-panel" aria-label="当日事项">
+    <section className="day-panel" aria-label={t(locale, "dayPanelAria")}>
       <h2 className="day-panel-heading">
-        <span className="day-panel-heading-main">{dayPanelTitle(day)}</span>
+        <span className="day-panel-heading-main">{dayPanelTitle(day, locale)}</span>
         <span className="day-panel-heading-culture">{cultureLine}</span>
       </h2>
 
@@ -70,11 +74,11 @@ export default function DayPanel({
           ref={inputRef}
           type="text"
           className="day-panel-input"
-          placeholder="记一件事…"
+          placeholder={t(locale, "newItemPlaceholder")}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           disabled={busy}
-          aria-label="新建事项"
+          aria-label={t(locale, "newItemAria")}
         />
       </form>
 
@@ -94,7 +98,7 @@ export default function DayPanel({
                     checked={done}
                     disabled={done || busy}
                     onChange={() => void onComplete(item.id)}
-                    aria-label={done ? "已完成" : "标记完成"}
+                    aria-label={done ? t(locale, "alreadyDone") : t(locale, "markDone")}
                   />
                   <span className="day-panel-item-title">{item.title}</span>
                 </label>
@@ -103,8 +107,8 @@ export default function DayPanel({
                   className="day-panel-delete"
                   disabled={busy}
                   onClick={() => void onDelete(item.id)}
-                  aria-label="删除"
-                  title="删除"
+                  aria-label={t(locale, "delete")}
+                  title={t(locale, "delete")}
                 >
                   ×
                 </button>

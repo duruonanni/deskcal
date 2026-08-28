@@ -26,5 +26,7 @@ pub fn settings_set(
         db::set_ui_settings(&conn, &settings).map_err(db_err_to_string)?;
     }
     let _ = app.emit("settings-changed", &settings);
+    #[cfg(target_os = "windows")]
+    crate::platform::refresh_tray_locale(&app, settings.locale);
     Ok(settings)
 }

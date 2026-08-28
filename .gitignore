@@ -30,3 +30,6 @@ coverage/
 
 # Tauri
 src-tauri/gen/
+
+# Brainstorm companion mockups
+.superpowers/

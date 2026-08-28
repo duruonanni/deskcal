@@ -15,8 +15,8 @@
       {
         "label": "widget",
         "title": "桌历",
-        "width": 380,
-        "height": 520,
+        "width": 480,
+        "height": 640,
         "decorations": false,
         "transparent": true,
         "skipTaskbar": true,

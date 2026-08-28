@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DEFAULT_UI_SETTINGS,
+  isDragExcludedTarget,
   itemsComplete,
   itemsCreate,
   itemsDelete,
   itemsListRange,
+  onItemsChanged,
   onQuickCapture,
   onSettingsChanged,
   settingsGet,
+  settingsSet,
+  widgetStartDragging,
   type CalendarItem,
   type UiSettings,
 } from "../services/tauriCommands";
+import { documentLang, t } from "../i18n/messages";
 import {
   buildMonthGrid,
   monthTitle,
@@ -42,6 +47,7 @@ export default function WidgetApp() {
   const [items, setItems] = useState<CalendarItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  const locale = ui.locale ?? "zh";
   const grid = useMemo(
     () => buildMonthGrid(viewDate.year, viewDate.month),
     [viewDate.year, viewDate.month],
@@ -55,9 +61,13 @@ export default function WidgetApp() {
       const data = await itemsListRange(grid.start, grid.end);
       setItems(data);
     } catch {
-      setError("加载事项失败，请稍后重试。");
+      setError(t(locale, "loadItemsFailed"));
     }
-  }, [grid.start, grid.end]);
+  }, [grid.start, grid.end, locale]);
+
+  useEffect(() => {
+    document.documentElement.lang = documentLang(locale);
+  }, [locale]);
 
   useEffect(() => {
     void loadItems();
@@ -73,6 +83,18 @@ export default function WidgetApp() {
       void unlisten?.();
     };
   }, []);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    void onItemsChanged(() => {
+      void loadItems();
+    }).then((fn) => {
+      unlisten = fn;
+    });
+    return () => {
+      void unlisten?.();
+    };
+  }, [loadItems]);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -127,6 +149,26 @@ export default function WidgetApp() {
 
   const handleFocusCaptureDone = useCallback(() => setFocusCapture(false), []);
 
+  function handleCardMouseDown(event: React.MouseEvent) {
+    if (ui.widgetLocked) return;
+    if (event.button !== 0) return;
+    if (isDragExcludedTarget(event.target)) return;
+    void widgetStartDragging();
+  }
+
+  async function persistUi(next: UiSettings) {
+    setUi(next);
+    try {
+      setUi(await settingsSet(next));
+    } catch {
+      setError(t(locale, "saveSettingsFailed"));
+    }
+  }
+
+  async function toggleLock() {
+    await persistUi({ ...ui, widgetLocked: !ui.widgetLocked });
+  }
+
   async function handleCreate(title: string) {
     if (!selectedDay) return;
     try {
@@ -134,7 +176,7 @@ export default function WidgetApp() {
       await itemsCreate({ title, day: selectedDay });
       await loadItems();
     } catch {
-      setError("创建失败，请稍后重试。");
+      setError(t(locale, "createFailed"));
     }
   }
 
@@ -144,7 +186,7 @@ export default function WidgetApp() {
       await itemsComplete(id);
       await loadItems();
     } catch {
-      setError("标记完成失败，请稍后重试。");
+      setError(t(locale, "completeFailed"));
     }
   }
 
@@ -154,7 +196,7 @@ export default function WidgetApp() {
       await itemsDelete(id);
       await loadItems();
     } catch {
-      setError("删除失败，请稍后重试。");
+      setError(t(locale, "deleteFailed"));
     }
   }
 
@@ -162,32 +204,46 @@ export default function WidgetApp() {
     ? (itemsByDay.get(selectedDay) ?? [])
     : [];
 
+  const shellClass = [
+    "widget-shell",
+    ui.widgetLocked ? "widget-shell--locked" : "widget-shell--unlocked",
+  ].join(" ");
+
   return (
-    <main className="widget-shell">
+    <main className={shellClass} onMouseDown={handleCardMouseDown}>
       <div
         className="widget-card"
         style={
           {
-            "--card-bg": `rgba(255, 252, 248, ${ui.widgetOpacity})`,
+            "--card-bg": `rgba(18, 24, 32, ${ui.widgetOpacity})`,
             "--text-shadow": ui.textOutline
-              ? "0 0 1px rgba(255, 255, 255, 0.85), 0 1px 2px rgba(0, 0, 0, 0.1)"
+              ? "0 0 3px rgba(0, 0, 0, 0.85), 0 1px 2px rgba(0, 0, 0, 0.45)"
               : "none",
           } as React.CSSProperties
         }
       >
-        <header className="widget-header" data-tauri-drag-region>
-          <h1 className="widget-title" data-tauri-drag-region>
-            {monthTitle(viewDate.year, viewDate.month)}
+        <header className="widget-header">
+          <h1 className="widget-title">
+            {monthTitle(viewDate.year, viewDate.month, locale)}
           </h1>
-          <div className="widget-header-actions" data-tauri-drag-region="false">
+          <div className="widget-header-actions" data-no-drag>
+            <button
+              type="button"
+              className={`widget-btn${ui.widgetLocked ? " widget-btn--active" : ""}`}
+              onClick={() => void toggleLock()}
+              aria-pressed={ui.widgetLocked}
+              title={ui.widgetLocked ? t(locale, "lockedHint") : t(locale, "unlockedHint")}
+            >
+              {ui.widgetLocked ? t(locale, "unlock") : t(locale, "lock")}
+            </button>
             <button type="button" className="widget-btn" onClick={goToToday}>
-              今天
+              {t(locale, "today")}
             </button>
             <button
               type="button"
               className="widget-btn widget-btn--icon"
               onClick={prevMonth}
-              aria-label="上个月"
+              aria-label={t(locale, "prevMonth")}
             >
               ‹
             </button>
@@ -195,7 +251,7 @@ export default function WidgetApp() {
               type="button"
               className="widget-btn widget-btn--icon"
               onClick={nextMonth}
-              aria-label="下个月"
+              aria-label={t(locale, "nextMonth")}
             >
               ›
             </button>
@@ -215,21 +271,25 @@ export default function WidgetApp() {
           selectedDay={selectedDay}
           itemsByDay={itemsByDay}
           showTitlesInCells={ui.showTitlesInCells}
+          locale={locale}
           onDayClick={handleDayClick}
           onDayDoubleClick={handleDayDoubleClick}
           onWheel={handleWheel}
         />
 
         {selectedDay && (
-          <DayPanel
-            day={selectedDay}
-            items={selectedItems}
-            focusCapture={focusCapture}
-            onFocusCaptureDone={handleFocusCaptureDone}
-            onCreate={handleCreate}
-            onComplete={handleComplete}
-            onDelete={handleDelete}
-          />
+          <div data-no-drag>
+            <DayPanel
+              day={selectedDay}
+              items={selectedItems}
+              locale={locale}
+              focusCapture={focusCapture}
+              onFocusCaptureDone={handleFocusCaptureDone}
+              onCreate={handleCreate}
+              onComplete={handleComplete}
+              onDelete={handleDelete}
+            />
+          </div>
         )}
       </div>
     </main>

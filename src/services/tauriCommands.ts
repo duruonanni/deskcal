@@ -5,6 +5,9 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+
+import type { AppLocale } from "../i18n/messages";
 
 export type ItemKind = "task" | "note" | "event";
 
@@ -72,16 +75,21 @@ export interface UiSettings {
   widgetOpacity: number;
   showTitlesInCells: boolean;
   textOutline: boolean;
+  locale: AppLocale;
+  widgetLocked: boolean;
 }
 
 export const DEFAULT_UI_SETTINGS: UiSettings = {
-  widgetOpacity: 0.78,
-  showTitlesInCells: false,
+  widgetOpacity: 0.42,
+  showTitlesInCells: true,
   textOutline: true,
+  locale: "zh",
+  widgetLocked: false,
 };
 
 export async function settingsGet(): Promise<UiSettings> {
-  return invoke<UiSettings>("settings_get");
+  const raw = await invoke<Partial<UiSettings>>("settings_get");
+  return { ...DEFAULT_UI_SETTINGS, ...raw };
 }
 
 export async function settingsSet(settings: UiSettings): Promise<UiSettings> {
@@ -92,6 +100,21 @@ export function onSettingsChanged(
   handler: (settings: UiSettings) => void,
 ): Promise<UnlistenFn> {
   return listen<UiSettings>("settings-changed", (event) => handler(event.payload));
+}
+
+export function onItemsChanged(handler: () => void): Promise<UnlistenFn> {
+  return listen("items-changed", () => handler());
+}
+
+export async function widgetStartDragging(): Promise<void> {
+  await getCurrentWindow().startDragging();
+}
+
+export function isDragExcludedTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return true;
+  return Boolean(
+    target.closest("button, input, a, textarea, select, label, [data-no-drag]"),
+  );
 }
 
 // --- app.* (future) ---

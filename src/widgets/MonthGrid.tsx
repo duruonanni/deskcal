@@ -1,8 +1,10 @@
 import type { CalendarItem } from "../services/tauriCommands";
+import type { AppLocale } from "../i18n/messages";
+import { t } from "../i18n/messages";
 import {
   formatDay,
   truncateTitle,
-  WEEKDAY_LABELS,
+  weekdayLabels,
   type MonthGridData,
 } from "./calendarUtils";
 import { dayCellSubLabel, holidayMark } from "./dayCulture";
@@ -14,6 +16,7 @@ interface MonthGridProps {
   selectedDay: string | null;
   itemsByDay: Map<string, CalendarItem[]>;
   showTitlesInCells: boolean;
+  locale: AppLocale;
   onDayClick: (day: string) => void;
   onDayDoubleClick: (day: string) => void;
   onWheel: (event: React.WheelEvent) => void;
@@ -23,6 +26,8 @@ function incompleteItems(items: CalendarItem[]): CalendarItem[] {
   return items.filter((item) => item.completedAt === null);
 }
 
+const CELL_TITLE_LIMIT = 4;
+
 export default function MonthGrid({
   grid,
   viewMonth,
@@ -30,6 +35,7 @@ export default function MonthGrid({
   selectedDay,
   itemsByDay,
   showTitlesInCells,
+  locale,
   onDayClick,
   onDayDoubleClick,
   onWheel,
@@ -37,31 +43,40 @@ export default function MonthGrid({
   return (
     <div className="calendar-body" onWheel={onWheel}>
       <div className="weekday-row" aria-hidden="true">
-        {WEEKDAY_LABELS.map((label) => (
+        {weekdayLabels(locale).map((label) => (
           <span key={label} className="weekday-cell">
             {label}
           </span>
         ))}
       </div>
 
-      <div className="month-grid" role="grid" aria-label="月历">
+      <div className="month-grid" role="grid" aria-label={t(locale, "monthGridAria")}>
         {grid.weeks.map((week, weekIndex) => (
           <div key={weekIndex} className="month-grid-row" role="row">
             {week.map((date) => {
               const day = formatDay(date);
               const isOtherMonth = date.getMonth() !== viewMonth;
               const isToday = day === today;
-              const isSelected = day === selectedDay;
               const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+              const isSelected = day === selectedDay;
               const dayItems = itemsByDay.get(day) ?? [];
               const pending = incompleteItems(dayItems);
               const hasDot = pending.length > 0;
               const mark = holidayMark(day);
               const subLabel = dayCellSubLabel(day, date);
               const ariaParts = [
-                `${date.getMonth() + 1}月${date.getDate()}日`,
+                locale === "en"
+                  ? date.toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                    })
+                  : `${date.getMonth() + 1}月${date.getDate()}日`,
                 subLabel,
-                mark?.kind === "rest" ? "休息日" : mark?.kind === "work" ? "调班" : null,
+                mark?.kind === "rest"
+                  ? t(locale, "restDay")
+                  : mark?.kind === "work"
+                    ? t(locale, "workDay")
+                    : null,
               ].filter(Boolean);
 
               const cellClass = [
@@ -80,6 +95,7 @@ export default function MonthGrid({
                   type="button"
                   className={cellClass}
                   role="gridcell"
+                  data-no-drag
                   aria-label={ariaParts.join("，")}
                   aria-pressed={isSelected}
                   onClick={() => onDayClick(day)}
@@ -87,25 +103,27 @@ export default function MonthGrid({
                 >
                   <span className="day-cell-top">
                     <span className="day-cell-number">{date.getDate()}</span>
+                    <span className="day-cell-lunar">{subLabel}</span>
                     {mark && (
                       <span
                         className={`day-cell-mark day-cell-mark--${mark.kind}`}
                         aria-hidden="true"
                       >
-                        {mark.kind === "rest" ? "休" : "班"}
+                        {mark.kind === "rest" ? (locale === "en" ? "Off" : "休") : locale === "en" ? "Work" : "班"}
                       </span>
                     )}
                   </span>
-                  <span className="day-cell-lunar">{subLabel}</span>
                   {showTitlesInCells ? (
                     <span className="day-cell-titles">
-                      {pending.slice(0, 2).map((item) => (
+                      {pending.slice(0, CELL_TITLE_LIMIT).map((item, index) => (
                         <span key={item.id} className="day-cell-title">
-                          {truncateTitle(item.title)}
+                          {index + 1}、{truncateTitle(item.title)}
                         </span>
                       ))}
-                      {pending.length > 2 && (
-                        <span className="day-cell-more">+{pending.length - 2}</span>
+                      {pending.length > CELL_TITLE_LIMIT && (
+                        <span className="day-cell-more">
+                          +{pending.length - CELL_TITLE_LIMIT}
+                        </span>
                       )}
                     </span>
                   ) : (

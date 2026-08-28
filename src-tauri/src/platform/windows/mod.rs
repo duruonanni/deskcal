@@ -14,11 +14,17 @@ use tauri::{
 use tauri::window::{Color, Effect, EffectsBuilder};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
+use crate::db;
+use crate::domain::AppLocale;
+use crate::AppState;
+
 pub const WIDGET_LABEL: &str = "widget";
 pub const SETTINGS_LABEL: &str = "settings";
 pub const LIST_LABEL: &str = "list";
 const GEOMETRY_FILE: &str = "window-widget.json";
 const SAVE_DEBOUNCE_MS: u64 = 300;
+const TOP_RIGHT_MARGIN_LOGICAL: i32 = 16;
+const PLACED_TOP_RIGHT_KEY: &str = "placed_top_right_v1";
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct WidgetGeometry {
@@ -101,6 +107,23 @@ pub fn clamp_geometry(
         })
         .collect();
     clamp_geometry_to_monitors(geometry, &rects)
+}
+
+/// Place the widget in the top-right of a monitor, with a margin from the edges.
+pub(crate) fn top_right_on_monitor(
+    monitor: MonitorRect,
+    width: u32,
+    height: u32,
+    margin: i32,
+) -> WidgetGeometry {
+    let x = (monitor.x + monitor.width as i32 - width as i32 - margin).max(monitor.x);
+    let y = monitor.y + margin;
+    WidgetGeometry {
+        x,
+        y,
+        width,
+        height,
+    }
 }
 
 fn geometry_file_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -210,6 +233,62 @@ pub fn restore_widget_geometry(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+fn apply_top_right_placement(app: &AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window(WIDGET_LABEL)
+        .ok_or_else(|| format!("window '{WIDGET_LABEL}' not found"))?;
+
+    let monitor = window
+        .primary_monitor()
+        .map_err(|e| format!("failed to read primary monitor: {e}"))?
+        .or(window
+            .current_monitor()
+            .map_err(|e| format!("failed to read current monitor: {e}"))?)
+        .ok_or_else(|| "no monitor available".to_string())?;
+
+    let size = window
+        .outer_size()
+        .map_err(|e| format!("failed to read widget size: {e}"))?;
+    let margin = (f64::from(TOP_RIGHT_MARGIN_LOGICAL) * monitor.scale_factor()).round() as i32;
+    let rect = MonitorRect {
+        x: monitor.position().x,
+        y: monitor.position().y,
+        width: monitor.size().width,
+        height: monitor.size().height,
+        primary: true,
+    };
+    let geometry = top_right_on_monitor(rect, size.width, size.height, margin);
+    window
+        .set_position(PhysicalPosition::new(geometry.x, geometry.y))
+        .map_err(|e| format!("failed to place widget at top-right: {e}"))?;
+    Ok(())
+}
+
+fn place_or_restore_widget(app: &AppHandle) -> Result<(), String> {
+    let should_place_default = {
+        let state = app.state::<AppState>();
+        let conn = state
+            .db
+            .lock()
+            .map_err(|_| "database lock poisoned".to_string())?;
+        match db::get_kv(&conn, PLACED_TOP_RIGHT_KEY).map_err(|e| e.to_string())? {
+            Some(_) => false,
+            None => {
+                db::set_kv(&conn, PLACED_TOP_RIGHT_KEY, "1").map_err(|e| e.to_string())?;
+                true
+            }
+        }
+    };
+
+    if should_place_default {
+        apply_top_right_placement(app)?;
+        save_widget_geometry_now(app);
+        return Ok(());
+    }
+
+    restore_widget_geometry(app)
+}
+
 pub fn setup_widget_geometry_persistence(app: &AppHandle) -> Result<(), String> {
     let window = app
         .get_webview_window(WIDGET_LABEL)
@@ -315,12 +394,43 @@ pub fn trigger_quick_capture(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-pub fn setup_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
-    let show_item = MenuItem::with_id(app, "show", "显示日历", true, None::<&str>)?;
-    let list_item = MenuItem::with_id(app, "list", "未完成", true, None::<&str>)?;
-    let settings_item = MenuItem::with_id(app, "settings", "设置", true, None::<&str>)?;
-    let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show_item, &list_item, &settings_item, &quit_item])?;
+fn tray_copy(locale: AppLocale) -> [&'static str; 5] {
+    match locale {
+        AppLocale::Zh => ["显示日历", "未完成", "设置", "退出", "桌历"],
+        AppLocale::En => ["Show calendar", "Incomplete", "Settings", "Quit", "DeskCal"],
+    }
+}
+
+fn build_tray_menu(
+    app: &AppHandle,
+    locale: AppLocale,
+) -> Result<Menu<tauri::Wry>, Box<dyn std::error::Error>> {
+    let [show, list, settings, quit, _] = tray_copy(locale);
+    let show_item = MenuItem::with_id(app, "show", show, true, None::<&str>)?;
+    let list_item = MenuItem::with_id(app, "list", list, true, None::<&str>)?;
+    let settings_item = MenuItem::with_id(app, "settings", settings, true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "quit", quit, true, None::<&str>)?;
+    Ok(Menu::with_items(
+        app,
+        &[&show_item, &list_item, &settings_item, &quit_item],
+    )?)
+}
+
+pub fn refresh_tray_locale(app: &AppHandle, locale: AppLocale) {
+    let Some(tray) = app.tray_by_id("deskcal-tray") else {
+        return;
+    };
+    if let Ok(menu) = build_tray_menu(app, locale) {
+        let _ = tray.set_menu(Some(menu));
+    }
+    let [_, _, _, _, tip] = tray_copy(locale);
+    let _ = tray.set_tooltip(Some(tip));
+}
+
+pub fn setup_tray(app: &App, locale: AppLocale) -> Result<(), Box<dyn std::error::Error>> {
+    let handle = app.handle();
+    let menu = build_tray_menu(handle, locale)?;
+    let [_, _, _, _, tip] = tray_copy(locale);
 
     let icon = app
         .default_window_icon()
@@ -329,7 +439,7 @@ pub fn setup_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
 
     TrayIconBuilder::with_id("deskcal-tray")
         .icon(icon)
-        .tooltip("桌历")
+        .tooltip(tip)
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
@@ -385,13 +495,24 @@ pub fn setup_windows_shell(app: &App) -> Result<(), String> {
         try_apply_widget_effects(&window);
     }
 
-    if let Err(err) = restore_widget_geometry(app.handle()) {
-        eprintln!("widget geometry restore skipped: {err}");
+    let locale = {
+        let state = app.state::<AppState>();
+        state
+            .db
+            .lock()
+            .ok()
+            .and_then(|conn| db::get_ui_settings(&conn).ok())
+            .map(|settings| settings.locale)
+            .unwrap_or_default()
+    };
+
+    if let Err(err) = place_or_restore_widget(app.handle()) {
+        eprintln!("widget placement skipped: {err}");
     }
 
     setup_widget_geometry_persistence(app.handle())?;
 
-    setup_tray(app).map_err(|e| e.to_string())?;
+    setup_tray(app, locale).map_err(|e| e.to_string())?;
     setup_global_shortcut(app).map_err(|e| e.to_string())?;
 
     Ok(())
@@ -442,5 +563,21 @@ mod tests {
         assert!(clamped.y >= 0);
         assert!(clamped.x + clamped.width as i32 <= 1920);
         assert!(clamped.y + clamped.height as i32 <= 1080);
+    }
+
+    #[test]
+    fn places_widget_at_top_right_with_margin() {
+        let monitor = MonitorRect {
+            x: 0,
+            y: 0,
+            width: 1920,
+            height: 1080,
+            primary: true,
+        };
+        let geometry = top_right_on_monitor(monitor, 460, 640, 16);
+        assert_eq!(geometry.x, 1920 - 460 - 16);
+        assert_eq!(geometry.y, 16);
+        assert_eq!(geometry.width, 460);
+        assert_eq!(geometry.height, 640);
     }
 }

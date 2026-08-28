@@ -9,13 +9,13 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  --accent: #c45a40;
-  --accent-ring: rgba(196, 90, 64, 0.55);
-  --card-bg: rgba(255, 252, 248, 0.75);
-  --text-muted: #5c5c5c;
-  --text-dim: #8a8a8a;
-  --border-soft: rgba(0, 0, 0, 0.08);
-  --text-shadow: 0 0 1px rgba(255, 255, 255, 0.85), 0 1px 2px rgba(0, 0, 0, 0.1);
+  --accent: #ff8a65;
+  --accent-ring: rgba(255, 138, 101, 0.55);
+  --card-bg: rgba(18, 24, 32, 0.42);
+  --text-muted: rgba(255, 255, 255, 0.72);
+  --text-dim: rgba(255, 255, 255, 0.48);
+  --border-soft: rgba(255, 255, 255, 0.16);
+  --text-shadow: 0 0 3px rgba(0, 0, 0, 0.85), 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 
 * {
@@ -38,6 +38,7 @@ body {
   padding: 1.25rem;
   background: #fafafa;
   min-height: 100vh;
+  color: #1a1a1a;
 }
 
 .app-title {
@@ -48,7 +49,7 @@ body {
 
 .app-subtitle {
   margin: 0 0 1rem;
-  color: var(--text-muted);
+  color: #666;
   font-size: 0.95rem;
 }
 
@@ -111,20 +112,53 @@ body {
   flex-shrink: 0;
 }
 
+.widget-btn--active {
+  background: rgba(196, 90, 64, 0.16);
+  border-color: rgba(196, 90, 64, 0.45);
+}
+
+.app-shell .widget-btn {
+  background: #fff;
+  color: #1a1a1a;
+  border-color: #ddd;
+}
+
+.app-shell .widget-btn--active {
+  background: #f3e8e4;
+  border-color: #c45a40;
+  color: #7a2e1e;
+}
+
 /* --- Widget (transparent frosted card) --- */
 
 .widget-shell {
-  padding: 10px;
+  padding: 8px;
   min-height: 100vh;
 }
 
+.widget-shell--unlocked .widget-header,
+.widget-shell--unlocked .weekday-row {
+  cursor: grab;
+}
+
+.widget-shell--unlocked .widget-header:active,
+.widget-shell--unlocked .weekday-row:active {
+  cursor: grabbing;
+}
+
+.widget-shell--locked .widget-header,
+.widget-shell--locked .weekday-row {
+  cursor: default;
+}
+
 .widget-card {
+  color: #f4f6f8;
   background: var(--card-bg);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.28);
   overflow: hidden;
   text-shadow: var(--text-shadow);
 }
@@ -142,7 +176,6 @@ body {
   font-size: 1.05rem;
   font-weight: 600;
   flex: 1;
-  cursor: default;
   user-select: none;
 }
 
@@ -156,19 +189,24 @@ body {
 .widget-btn {
   appearance: none;
   border: 1px solid var(--border-soft);
-  background: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.12);
   color: inherit;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   line-height: 1;
-  padding: 4px 8px;
+  padding: 5px 8px;
   border-radius: 6px;
   cursor: pointer;
   text-shadow: var(--text-shadow);
 }
 
 .widget-btn:hover {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.widget-card .widget-btn--active {
+  background: rgba(255, 138, 101, 0.28);
+  border-color: rgba(255, 138, 101, 0.7);
 }
 
 .widget-btn--icon {
@@ -181,7 +219,7 @@ body {
   margin: 0;
   padding: 4px 12px 8px;
   font-size: 0.78rem;
-  color: #a33;
+  color: #ffb4a8;
   text-shadow: none;
 }
 
@@ -197,12 +235,17 @@ body {
   margin-bottom: 4px;
 }
 
+.app-shell .widget-error {
+  color: #a33;
+}
+
 .weekday-cell {
   text-align: center;
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--text-muted);
-  padding: 2px 0;
+  padding: 4px 0;
+  user-select: none;
 }
 
 .month-grid {
@@ -219,40 +262,40 @@ body {
 
 .day-cell {
   appearance: none;
-  border: 2px solid transparent;
-  background: rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
   color: inherit;
   font: inherit;
-  border-radius: 8px;
-  min-height: 44px;
-  padding: 3px 2px 4px;
+  border-radius: 4px;
+  min-height: 72px;
+  padding: 3px 4px 4px;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 2px;
   cursor: pointer;
   text-shadow: var(--text-shadow);
 }
 
 .day-cell:hover {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .day-cell--other {
-  opacity: 0.42;
+  opacity: 0.38;
 }
 
 .day-cell--weekend .day-cell-number {
-  color: var(--text-dim);
+  color: #ffab91;
 }
 
 .day-cell--today {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent-ring);
+  box-shadow: inset 0 0 0 1px var(--accent-ring);
 }
 
 .day-cell--selected {
-  background: rgba(196, 90, 64, 0.14);
+  background: rgba(255, 138, 101, 0.18);
 }
 
 .day-cell-number {
@@ -264,39 +307,39 @@ body {
 .day-cell-top {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 3px;
+  justify-content: flex-start;
+  gap: 4px;
   width: 100%;
-}
-
-.day-cell-mark {
-  font-size: 0.52rem;
-  font-weight: 700;
-  line-height: 1;
-  padding: 1px 3px;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-
-.day-cell-mark--rest {
-  color: #c62828;
-  background: rgba(198, 40, 40, 0.12);
-}
-
-.day-cell-mark--work {
-  color: #455a64;
-  background: rgba(69, 90, 100, 0.14);
 }
 
 .day-cell-lunar {
   font-size: 0.58rem;
   line-height: 1.1;
   color: var(--text-muted);
-  max-width: 100%;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-align: center;
+}
+
+.day-cell-mark {
+  font-size: 0.5rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.day-cell-mark--rest {
+  color: #e8fff0;
+  background: rgba(46, 125, 50, 0.85);
+}
+
+.day-cell-mark--work {
+  color: #fff5f5;
+  background: rgba(198, 40, 40, 0.9);
 }
 
 .day-cell-dot {
@@ -318,12 +361,12 @@ body {
 
 .day-cell-title {
   font-size: 0.58rem;
-  line-height: 1.15;
-  text-align: center;
+  line-height: 1.2;
+  text-align: left;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: #333;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .day-cell-more {
@@ -337,7 +380,7 @@ body {
 .day-panel {
   border-top: 1px solid var(--border-soft);
   padding: 10px 12px 12px;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.18);
 }
 
 .day-panel-heading {
@@ -369,7 +412,7 @@ body {
   padding: 7px 10px;
   font: inherit;
   font-size: 0.85rem;
-  background: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.12);
   color: inherit;
   text-shadow: none;
 }
@@ -401,7 +444,7 @@ body {
 }
 
 .day-panel-item:hover {
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .day-panel-item--done {
@@ -449,6 +492,6 @@ body {
 }
 
 .day-panel-delete:hover {
-  color: #a33;
-  background: rgba(0, 0, 0, 0.05);
+  color: #ffb4a8;
+  background: rgba(255, 255, 255, 0.08);
 }

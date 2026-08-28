@@ -34,12 +34,16 @@ export function dayCellSubLabel(day: string, date: Date): string {
 }
 
 /** Extra culture line for the day panel heading. */
-export function dayPanelCultureLine(day: string, date: Date): string {
+export function dayPanelCultureLine(
+  day: string,
+  date: Date,
+  locale: "zh" | "en" = "zh",
+): string {
   const lunar = lunarLabel(date);
   const mark = holidayMark(day);
   if (!mark) {
     return lunar;
   }
-  const markTag = mark.kind === "rest" ? "休" : "班";
+  const markTag = mark.kind === "rest" ? (locale === "en" ? "Off" : "休") : locale === "en" ? "Work" : "班";
   return `${lunar} · ${mark.name}（${markTag}）`;
 }

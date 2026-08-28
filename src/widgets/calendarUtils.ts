@@ -1,7 +1,27 @@
-const WEEKDAY_LABELS = ["一", "二", "三", "四", "五", "六", "日"] as const;
-const WEEKDAY_ZH = ["日", "一", "二", "三", "四", "五", "六"] as const;
+import type { AppLocale } from "../i18n/messages";
 
-export { WEEKDAY_LABELS };
+const WEEKDAY_LABELS_ZH = ["一", "二", "三", "四", "五", "六", "日"] as const;
+const WEEKDAY_LABELS_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const WEEKDAY_ZH = ["日", "一", "二", "三", "四", "五", "六"] as const;
+const MONTHS_EN = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+const WEEKDAY_EN_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+export function weekdayLabels(locale: AppLocale): readonly string[] {
+  return locale === "en" ? WEEKDAY_LABELS_EN : WEEKDAY_LABELS_ZH;
+}
 
 export function formatDay(date: Date): string {
   const y = date.getFullYear();
@@ -19,14 +39,20 @@ export function todayString(): string {
   return formatDay(new Date());
 }
 
-export function monthTitle(year: number, month: number): string {
+export function monthTitle(year: number, month: number, locale: AppLocale = "zh"): string {
+  if (locale === "en") {
+    return `${MONTHS_EN[month]} ${year}`;
+  }
   return `${year}年${month + 1}月`;
 }
 
-export function dayPanelTitle(day: string): string {
+export function dayPanelTitle(day: string, locale: AppLocale = "zh"): string {
   const date = parseDay(day);
   const m = date.getMonth() + 1;
   const d = date.getDate();
+  if (locale === "en") {
+    return `${WEEKDAY_EN_SHORT[date.getDay()]}, ${MONTHS_EN[date.getMonth()].slice(0, 3)} ${d}`;
+  }
   const w = WEEKDAY_ZH[date.getDay()];
   return `${m}月${d}日 周${w}`;
 }
@@ -67,7 +93,7 @@ export function isWeekend(date: Date): boolean {
   return day === 0 || day === 6;
 }
 
-export function truncateTitle(title: string, maxLen = 6): string {
+export function truncateTitle(title: string, maxLen = 10): string {
   const trimmed = title.trim();
   if (trimmed.length <= maxLen) return trimmed;
   return `${trimmed.slice(0, maxLen)}…`;

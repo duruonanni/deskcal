@@ -6,6 +6,9 @@ use ulid::Ulid;
 
 use crate::domain::{Item, ItemKind, ListRange, NewItem, UiSettings, UpdateItemPatch};
 
+const UI_REV_KEY: &str = "ui_rev";
+const UI_REV_CELL_TITLES: &str = "2";
+
 #[derive(Debug, Error)]
 pub enum DbError {
     #[error("sqlite: {0}")]
@@ -48,6 +51,40 @@ pub fn migrate(conn: &Connection) -> Result<(), DbError> {
         );
         "#,
     )?;
+    migrate_ui_rev(conn)?;
+    Ok(())
+}
+
+pub fn get_kv(conn: &Connection, key: &str) -> Result<Option<String>, DbError> {
+    let value: Result<String, rusqlite::Error> = conn.query_row(
+        "SELECT value FROM kv WHERE key = ?1",
+        params![key],
+        |row| row.get(0),
+    );
+    match value {
+        Ok(raw) => Ok(Some(raw)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(err) => Err(DbError::Sqlite(err)),
+    }
+}
+
+pub fn set_kv(conn: &Connection, key: &str, value: &str) -> Result<(), DbError> {
+    conn.execute(
+        "INSERT INTO kv (key, value) VALUES (?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![key, value],
+    )?;
+    Ok(())
+}
+
+fn migrate_ui_rev(conn: &Connection) -> Result<(), DbError> {
+    if get_kv(conn, UI_REV_KEY)?.as_deref() == Some(UI_REV_CELL_TITLES) {
+        return Ok(());
+    }
+    let mut settings = get_ui_settings(conn)?;
+    settings.show_titles_in_cells = true;
+    set_ui_settings(conn, &settings)?;
+    set_kv(conn, UI_REV_KEY, UI_REV_CELL_TITLES)?;
     Ok(())
 }
 
@@ -355,13 +392,16 @@ mod tests {
     fn ui_settings_default_then_roundtrip() {
         let (conn, _file) = open_test_db();
         let initial = get_ui_settings(&conn).expect("default settings");
-        assert!(!initial.show_titles_in_cells);
+        assert!(initial.show_titles_in_cells);
+        assert!(!initial.widget_locked);
         let mut next = initial;
-        next.show_titles_in_cells = true;
+        next.show_titles_in_cells = false;
         next.widget_opacity = 0.5;
+        next.widget_locked = true;
         set_ui_settings(&conn, &next).expect("save settings");
         let loaded = get_ui_settings(&conn).expect("load settings");
-        assert!(loaded.show_titles_in_cells);
+        assert!(!loaded.show_titles_in_cells);
+        assert!(loaded.widget_locked);
         assert!((loaded.widget_opacity - 0.5).abs() < f32::EPSILON);
     }
 }

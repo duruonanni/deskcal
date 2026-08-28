@@ -1,4 +1,4 @@
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 use crate::db::{self, DbError};
 use crate::domain::{Item, ItemKind, ListRange, NewItem, UpdateItemPatch};
@@ -6,6 +6,10 @@ use crate::AppState;
 
 fn db_err_to_string(err: DbError) -> String {
     err.to_string()
+}
+
+fn emit_items_changed(app: &AppHandle) {
+    let _ = app.emit("items-changed", ());
 }
 
 #[tauri::command]
@@ -20,27 +24,33 @@ pub fn items_list_range(
 
 #[tauri::command]
 pub fn items_create(
+    app: AppHandle,
     state: State<'_, AppState>,
     title: String,
     day: String,
     kind: Option<ItemKind>,
     notes: Option<String>,
 ) -> Result<Item, String> {
-    let conn = state.db.lock().map_err(|_| "database lock poisoned".to_string())?;
-    db::create_item(
-        &conn,
-        NewItem {
-            title,
-            day,
-            kind,
-            notes,
-        },
-    )
-    .map_err(db_err_to_string)
+    let item = {
+        let conn = state.db.lock().map_err(|_| "database lock poisoned".to_string())?;
+        db::create_item(
+            &conn,
+            NewItem {
+                title,
+                day,
+                kind,
+                notes,
+            },
+        )
+        .map_err(db_err_to_string)?
+    };
+    emit_items_changed(&app);
+    Ok(item)
 }
 
 #[tauri::command]
 pub fn items_update(
+    app: AppHandle,
     state: State<'_, AppState>,
     id: String,
     title: Option<String>,
@@ -48,30 +58,42 @@ pub fn items_update(
     day: Option<String>,
     kind: Option<ItemKind>,
 ) -> Result<Item, String> {
-    let conn = state.db.lock().map_err(|_| "database lock poisoned".to_string())?;
-    db::update_item(
-        &conn,
-        &id,
-        UpdateItemPatch {
-            title,
-            notes,
-            day,
-            kind,
-        },
-    )
-    .map_err(db_err_to_string)
+    let item = {
+        let conn = state.db.lock().map_err(|_| "database lock poisoned".to_string())?;
+        db::update_item(
+            &conn,
+            &id,
+            UpdateItemPatch {
+                title,
+                notes,
+                day,
+                kind,
+            },
+        )
+        .map_err(db_err_to_string)?
+    };
+    emit_items_changed(&app);
+    Ok(item)
 }
 
 #[tauri::command]
-pub fn items_complete(state: State<'_, AppState>, id: String) -> Result<Item, String> {
-    let conn = state.db.lock().map_err(|_| "database lock poisoned".to_string())?;
-    db::complete_item(&conn, &id).map_err(db_err_to_string)
+pub fn items_complete(app: AppHandle, state: State<'_, AppState>, id: String) -> Result<Item, String> {
+    let item = {
+        let conn = state.db.lock().map_err(|_| "database lock poisoned".to_string())?;
+        db::complete_item(&conn, &id).map_err(db_err_to_string)?
+    };
+    emit_items_changed(&app);
+    Ok(item)
 }
 
 #[tauri::command]
-pub fn items_delete(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    let conn = state.db.lock().map_err(|_| "database lock poisoned".to_string())?;
-    db::delete_item(&conn, &id).map_err(db_err_to_string)
+pub fn items_delete(app: AppHandle, state: State<'_, AppState>, id: String) -> Result<(), String> {
+    {
+        let conn = state.db.lock().map_err(|_| "database lock poisoned".to_string())?;
+        db::delete_item(&conn, &id).map_err(db_err_to_string)?;
+    }
+    emit_items_changed(&app);
+    Ok(())
 }
 
 #[tauri::command]
