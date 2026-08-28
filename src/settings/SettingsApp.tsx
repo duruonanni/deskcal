@@ -10,12 +10,14 @@ import {
   type UiSettings,
 } from "../services/tauriCommands";
 import { documentLang, t, type AppLocale } from "../i18n/messages";
+import { useDeskCalTheme } from "../theme/useDeskCalTheme";
 
 export default function SettingsApp() {
   const [settings, setSettings] = useState<UiSettings>(DEFAULT_UI_SETTINGS);
   const [error, setError] = useState<string | null>(null);
   const [stubMessage, setStubMessage] = useState<string | null>(null);
   const locale = settings.locale ?? "zh";
+  useDeskCalTheme(settings);
 
   useEffect(() => {
     document.documentElement.lang = documentLang(locale);

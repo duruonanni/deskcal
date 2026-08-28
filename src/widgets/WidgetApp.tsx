@@ -21,6 +21,7 @@ import {
   monthTitle,
   todayString,
 } from "./calendarUtils";
+import { useDeskCalTheme } from "../theme/useDeskCalTheme";
 import DayPanel from "./DayPanel";
 import MonthGrid from "./MonthGrid";
 
@@ -48,6 +49,7 @@ export default function WidgetApp() {
   const [error, setError] = useState<string | null>(null);
 
   const locale = ui.locale ?? "zh";
+  useDeskCalTheme(ui);
   const grid = useMemo(
     () => buildMonthGrid(viewDate.year, viewDate.month),
     [viewDate.year, viewDate.month],
@@ -211,17 +213,7 @@ export default function WidgetApp() {
 
   return (
     <main className={shellClass} onMouseDown={handleCardMouseDown}>
-      <div
-        className="widget-card"
-        style={
-          {
-            "--card-bg": `rgba(18, 24, 32, ${ui.widgetOpacity})`,
-            "--text-shadow": ui.textOutline
-              ? "0 0 3px rgba(0, 0, 0, 0.85), 0 1px 2px rgba(0, 0, 0, 0.45)"
-              : "none",
-          } as React.CSSProperties
-        }
-      >
+      <div className="widget-card">
         <header className="widget-header">
           <h1 className="widget-title">
             {monthTitle(viewDate.year, viewDate.month, locale)}
