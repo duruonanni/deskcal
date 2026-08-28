@@ -71,20 +71,24 @@ export async function itemsListIncomplete(): Promise<CalendarItem[]> {
   return invoke<CalendarItem[]>("items_list_incomplete");
 }
 
+export type ThemeMode = "auto" | "light" | "dark";
+
 export interface UiSettings {
   widgetOpacity: number;
   showTitlesInCells: boolean;
   textOutline: boolean;
   locale: AppLocale;
   widgetLocked: boolean;
+  themeMode: ThemeMode;
 }
 
 export const DEFAULT_UI_SETTINGS: UiSettings = {
-  widgetOpacity: 0.42,
-  showTitlesInCells: true,
+  widgetOpacity: 0.25,
+  showTitlesInCells: false,
   textOutline: true,
   locale: "zh",
   widgetLocked: false,
+  themeMode: "auto",
 };
 
 export async function settingsGet(): Promise<UiSettings> {
@@ -94,6 +98,10 @@ export async function settingsGet(): Promise<UiSettings> {
 
 export async function settingsSet(settings: UiSettings): Promise<UiSettings> {
   return invoke<UiSettings>("settings_set", { settings });
+}
+
+export async function themeCustomRead(): Promise<string | null> {
+  return invoke<string | null>("theme_custom_read");
 }
 
 export function onSettingsChanged(

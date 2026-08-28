@@ -59,6 +59,7 @@ pub fn run() {
             commands::app::app_open_list,
             commands::settings::settings_get,
             commands::settings::settings_set,
+            commands::settings::theme_custom_read,
             commands::items::items_list_incomplete,
             ai::ai_run,
             sync::sync_export,

@@ -1,4 +1,4 @@
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::db::{self, DbError};
 use crate::domain::UiSettings;
@@ -29,4 +29,18 @@ pub fn settings_set(
     #[cfg(target_os = "windows")]
     crate::platform::refresh_tray_locale(&app, settings.locale);
     Ok(settings)
+}
+
+#[tauri::command]
+pub fn theme_custom_read(app: AppHandle) -> Result<Option<String>, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("app data dir: {e}"))?;
+    let path = dir.join("themes").join("custom.json");
+    match std::fs::read_to_string(&path) {
+        Ok(raw) => Ok(Some(raw)),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(err) => Err(err.to_string()),
+    }
 }
