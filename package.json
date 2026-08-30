@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "tauri": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/with-windows-build-env.ps1",
     "test": "vitest run",
+    "release": "node scripts/bump-version.mjs && npm run tauri -- build",
     "version:bump": "node scripts/bump-version.mjs",
     "version:sync": "node scripts/sync-version.mjs",
     "icons:generate": "python scripts/generate-icons.py"

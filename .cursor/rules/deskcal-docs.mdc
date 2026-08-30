@@ -1,0 +1,43 @@
+---
+description: DeskCal doc placement, session handoff, and release versioning
+alwaysApply: true
+---
+
+# DeskCal — docs and release
+
+## Session start
+
+1. Read `SESSION_HANDOFF.md` for current work and smoke checklist.
+2. Read `DECISIONS.md` § **Current truth** for locked product/tech choices.
+3. Do not duplicate Studio root `CLAUDE.md` inside this project.
+
+## Session end (meaningful work)
+
+| Change type | Update |
+|-------------|--------|
+| Behavior, bugs fixed, smoke status, next actions | `SESSION_HANDOFF.md` — refresh `Last Session` (date heading), `Smoke / Verify`, `Next Step` |
+| New or superseded architectural/product constraint | `DECISIONS.md` — new dated entry + refresh § **Current truth** |
+| Trivial fix, no state change | Docs optional; say `none` in closeout |
+
+### SESSION_HANDOFF rules
+
+- Keep `Last Session` to the **last 2–3 session dates**; drop older bullets.
+- Put operational reminders here (DB path, dev caveats, smoke pending).
+- Do **not** write full ADRs here — link to `DECISIONS.md`.
+- If file exceeds ~100 lines, prune old session bullets.
+
+### DECISIONS rules
+
+- § **Current truth** must stay scannable (~15 bullets max).
+- Append dated entries only for choices that still matter in six months.
+- Do **not** put here: Figma quota, smoke pending, commit commands, session progress.
+- Mark superseded decisions; do not delete history.
+
+## Version and release
+
+- SSOT: `package.json` `"version"`.
+- **Bump only** via `npm run release` (patch bump + sync + `tauri build`).
+- Same version republish: `DESKCAL_SKIP_VERSION_BUMP=1 npm run release`.
+- Minor/major: `DESKCAL_VERSION_BUMP=minor npm run release` (or `major`).
+- Ordinary git commits do **not** run `version:bump`.
+- After bump, `scripts/sync-version.mjs` updates `tauri.conf.json`, `Cargo.toml`, `Cargo.lock`.
