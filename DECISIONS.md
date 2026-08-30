@@ -97,7 +97,13 @@
 - **decision:** SSOT remains `package.json` `"version"`. Before each git commit, run `npm run version:bump` (patch, or `DESKCAL_VERSION_BUMP=minor|major`). `scripts/sync-version.mjs` copies that version into `tauri.conf.json`, `Cargo.toml`, and the `deskcal` entry in `Cargo.lock`. The settings window shows it via Vite `define` `__APP_VERSION__` (reads `package.json` at build time). Do not hand-edit a second VERSION constant.
 - **consequence:** Settings title row shows `版本 x.y.z`. Installer/bundle metadata stays aligned with npm.
 
+## 2026-08-30 — Public GitHub repo under MIT
+
+- **status:** accepted
+- **context:** Owner wants this personal desktop calendar on GitHub as open source.
+- **decision:** Keep **MIT** (already in `LICENSE`): short, permissive, no copyleft. Public remote is `https://github.com/duruonanni/deskcal`.
+- **consequence:** Anyone can use, fork, and ship derivatives with attribution. No GPL obligation.
+
 ## Open (not yet decided)
 
-- Public GitHub remote name and whether the first remote is private.
 - Whether V0.5 adds recurrence / `due_at` before BYOK AI.

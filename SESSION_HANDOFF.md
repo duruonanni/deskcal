@@ -3,27 +3,25 @@
 ## Current State
 
 - **project:** DeskCal (桌历)
-- **status:** Week-grid / desktop-widget round ready to commit on `feature/editorial-glass-ui`.
-- **current focus:** After commit, owner can merge when happy.
+- **status:** Public GitHub repo `duruonanni/deskcal` (MIT). Latest work is on `main` after the week-grid branch.
+- **current focus:** Optional merge cleanup / next feature.
 
 ## What Changed
 
-- Rolling week grid, cell popover, holiday fetch, Win+Right default size, stay-on-desktop, move-only frame.
-- Version SSOT `package.json`; `npm run version:bump` before each commit; settings shows `版本 x.y.z`.
+- Public remote: https://github.com/duruonanni/deskcal
+- License: MIT (existing `LICENSE`).
 
 ## What Matters Most Now
 
-- `npm run tauri` goes through `scripts/with-windows-build-env.ps1`.
+- Before future commits: `npm run version:bump`.
 - Live DB stays in `%APPDATA%\dev.deskcal.app\app.db`.
-- Before future commits: `npm run version:bump` (patch default).
 
 ## Recommended Next Step
 
-1. Merge `feature/editorial-glass-ui` when happy.
-2. Next commit: bump version first.
+1. Use GitHub for issues/releases when ready.
+2. Next product work: recurrence / `due_at` still open.
 
 ## Useful References
 
-- `docs/superpowers/plans/2026-08-30-xdiarys-week-grid.md`
+- https://github.com/duruonanni/deskcal
 - `DECISIONS.md`
-- `npm test` / `npm run build` / `cd src-tauri; cargo test`

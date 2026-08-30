@@ -4,7 +4,8 @@ Offline-first Windows desktop calendar widget. Click a day to jot tasks, with Ch
 
 | | |
 |---|---|
-| **Type** | Personal (open-source intent, MIT) |
+| **License** | MIT (`LICENSE`) |
+| **GitHub** | https://github.com/duruonanni/deskcal |
 | **Platform** | Windows 10/11 |
 | **Stage** | V0 — local widget + SQLite |
 | **Version SSOT** | `package.json` `"version"` (bump with `npm run version:bump` before each commit; settings shows it) |
@@ -52,6 +53,10 @@ SQLite path: `%APPDATA%\dev.deskcal.app\app.db` — never put the live DB in One
 - `DECISIONS.md` — locked product/tech choices
 - `SESSION_HANDOFF.md` — current state for the next session
 - Figma (optional, drafts): https://www.figma.com/design/8IVe6sQ0nL4oIxmmx1CIQj
+
+## License
+
+MIT. See [`LICENSE`](LICENSE).
 
 ## Next step
 
