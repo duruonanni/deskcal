@@ -2,6 +2,7 @@ mod ai;
 mod commands;
 mod db;
 mod domain;
+mod holidays;
 mod platform;
 mod sync;
 
@@ -61,6 +62,11 @@ pub fn run() {
             commands::settings::settings_set,
             commands::settings::theme_custom_read,
             commands::items::items_list_incomplete,
+            commands::items::items_uncomplete,
+            commands::items::items_reorder,
+            commands::holidays::holidays_get,
+            commands::holidays::holidays_refresh,
+            commands::holidays::holidays_status,
             ai::ai_run,
             sync::sync_export,
             sync::sync_import,

@@ -51,6 +51,10 @@ pub fn migrate(conn: &Connection) -> Result<(), DbError> {
         );
         "#,
     )?;
+    conn.execute(
+        "UPDATE items SET sort = created_at WHERE sort IS NULL",
+        [],
+    )?;
     migrate_ui_rev(conn)?;
     Ok(())
 }
@@ -102,6 +106,7 @@ fn row_to_item(row: &Row<'_>) -> Result<Item, DbError> {
         notes: row.get("notes")?,
         day: row.get("day")?,
         completed_at: row.get("completed_at")?,
+        sort: row.get("sort")?,
         created_at: row.get("created_at")?,
         updated_at: row.get("updated_at")?,
         deleted_at: row.get("deleted_at")?,
@@ -110,7 +115,7 @@ fn row_to_item(row: &Row<'_>) -> Result<Item, DbError> {
 
 fn get_item(conn: &Connection, id: &str) -> Result<Item, DbError> {
     let mut stmt = conn.prepare(
-        "SELECT id, kind, title, notes, day, completed_at, created_at, updated_at, deleted_at
+        "SELECT id, kind, title, notes, day, completed_at, sort, created_at, updated_at, deleted_at
          FROM items WHERE id = ?1",
     )?;
     let mut rows = stmt.query(params![id])?;
@@ -126,10 +131,16 @@ pub fn create_item(conn: &Connection, new: NewItem) -> Result<Item, DbError> {
     let kind = new.kind.unwrap_or_default();
     let notes = new.notes.unwrap_or_default();
 
+    let next_sort: i64 = conn.query_row(
+        "SELECT 1 + COALESCE(MAX(sort), 0) FROM items WHERE day = ?1 AND deleted_at IS NULL",
+        params![new.day],
+        |row| row.get(0),
+    )?;
+
     conn.execute(
-        "INSERT INTO items (id, kind, title, notes, day, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        params![id, kind.as_str(), new.title, notes, new.day, now, now],
+        "INSERT INTO items (id, kind, title, notes, day, sort, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params![id, kind.as_str(), new.title, notes, new.day, next_sort, now, now],
     )?;
 
     get_item(conn, &id)
@@ -175,6 +186,51 @@ pub fn complete_item(conn: &Connection, id: &str) -> Result<Item, DbError> {
     get_item(conn, id)
 }
 
+pub fn uncomplete_item(conn: &Connection, id: &str) -> Result<Item, DbError> {
+    let now = now_ms();
+    let rows = conn.execute(
+        "UPDATE items SET completed_at = NULL, updated_at = ?1 WHERE id = ?2 AND deleted_at IS NULL",
+        params![now, id],
+    )?;
+
+    if rows == 0 {
+        return Err(DbError::NotFound(id.to_string()));
+    }
+
+    get_item(conn, id)
+}
+
+pub fn reorder_items(conn: &Connection, day: &str, ids: &[String]) -> Result<(), DbError> {
+    let mut seen = std::collections::HashSet::new();
+    for id in ids {
+        if !seen.insert(id.as_str()) {
+            return Err(DbError::InvalidInput(format!("duplicate id: {id}")));
+        }
+        let item = get_item(conn, id)?;
+        if item.deleted_at.is_some() {
+            return Err(DbError::InvalidInput(format!("item deleted: {id}")));
+        }
+        if item.day != day {
+            return Err(DbError::InvalidInput(format!(
+                "item {id} is not on day {day}"
+            )));
+        }
+    }
+
+    let now = now_ms();
+    for (sort, id) in ids.iter().enumerate() {
+        let rows = conn.execute(
+            "UPDATE items SET sort = ?1, updated_at = ?2 WHERE id = ?3 AND deleted_at IS NULL",
+            params![sort as i64 + 1, now, id],
+        )?;
+        if rows == 0 {
+            return Err(DbError::NotFound(id.clone()));
+        }
+    }
+
+    Ok(())
+}
+
 pub fn delete_item(conn: &Connection, id: &str) -> Result<(), DbError> {
     let now = now_ms();
     let rows = conn.execute(
@@ -191,10 +247,10 @@ pub fn delete_item(conn: &Connection, id: &str) -> Result<(), DbError> {
 
 pub fn list_range(conn: &Connection, range: ListRange) -> Result<Vec<Item>, DbError> {
     let mut stmt = conn.prepare(
-        "SELECT id, kind, title, notes, day, completed_at, created_at, updated_at, deleted_at
+        "SELECT id, kind, title, notes, day, completed_at, sort, created_at, updated_at, deleted_at
          FROM items
          WHERE day >= ?1 AND day <= ?2 AND deleted_at IS NULL
-         ORDER BY day ASC, created_at ASC",
+         ORDER BY day ASC, sort ASC, created_at ASC",
     )?;
 
     let items = stmt
@@ -239,10 +295,10 @@ pub fn set_ui_settings(conn: &Connection, settings: &UiSettings) -> Result<(), D
 
 pub fn list_incomplete(conn: &Connection) -> Result<Vec<Item>, DbError> {
     let mut stmt = conn.prepare(
-        "SELECT id, kind, title, notes, day, completed_at, created_at, updated_at, deleted_at
+        "SELECT id, kind, title, notes, day, completed_at, sort, created_at, updated_at, deleted_at
          FROM items
          WHERE deleted_at IS NULL AND completed_at IS NULL
-         ORDER BY day ASC, created_at ASC",
+         ORDER BY day ASC, sort ASC, created_at ASC",
     )?;
     let mut rows = stmt.query([])?;
     let mut items = Vec::new();
@@ -401,5 +457,137 @@ mod tests {
         assert!(!loaded.show_titles_in_cells);
         assert!(loaded.widget_locked);
         assert!((loaded.widget_opacity - 0.3).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn create_same_day_assigns_incrementing_sort() {
+        let (conn, _file) = open_test_db();
+        let a = create_item(
+            &conn,
+            NewItem {
+                title: "First".to_string(),
+                day: "2026-08-28".to_string(),
+                kind: None,
+                notes: None,
+            },
+        )
+        .expect("create first");
+        let b = create_item(
+            &conn,
+            NewItem {
+                title: "Second".to_string(),
+                day: "2026-08-28".to_string(),
+                kind: None,
+                notes: None,
+            },
+        )
+        .expect("create second");
+
+        assert_eq!(a.sort, 1);
+        assert_eq!(b.sort, 2);
+    }
+
+    #[test]
+    fn uncomplete_clears_completed_at() {
+        let (conn, _file) = open_test_db();
+        let created = create_item(
+            &conn,
+            NewItem {
+                title: "Task".to_string(),
+                day: "2026-08-28".to_string(),
+                kind: None,
+                notes: None,
+            },
+        )
+        .expect("create item");
+
+        let completed = complete_item(&conn, &created.id).expect("complete");
+        assert!(completed.completed_at.is_some());
+
+        let restored = uncomplete_item(&conn, &created.id).expect("uncomplete");
+        assert!(restored.completed_at.is_none());
+    }
+
+    #[test]
+    fn reorder_swaps_sort_order() {
+        let (conn, _file) = open_test_db();
+        let a = create_item(
+            &conn,
+            NewItem {
+                title: "A".to_string(),
+                day: "2026-08-28".to_string(),
+                kind: None,
+                notes: None,
+            },
+        )
+        .expect("create a");
+        let b = create_item(
+            &conn,
+            NewItem {
+                title: "B".to_string(),
+                day: "2026-08-28".to_string(),
+                kind: None,
+                notes: None,
+            },
+        )
+        .expect("create b");
+
+        reorder_items(&conn, "2026-08-28", &[b.id.clone(), a.id.clone()])
+            .expect("reorder");
+
+        let items = list_range(
+            &conn,
+            ListRange {
+                start: "2026-08-28".to_string(),
+                end: "2026-08-28".to_string(),
+            },
+        )
+        .expect("list");
+
+        assert_eq!(items[0].id, b.id);
+        assert_eq!(items[0].sort, 1);
+        assert_eq!(items[1].id, a.id);
+        assert_eq!(items[1].sort, 2);
+    }
+
+    #[test]
+    fn completed_items_keep_sort_after_complete() {
+        let (conn, _file) = open_test_db();
+        let a = create_item(
+            &conn,
+            NewItem {
+                title: "A".to_string(),
+                day: "2026-08-28".to_string(),
+                kind: None,
+                notes: None,
+            },
+        )
+        .expect("create a");
+        let b = create_item(
+            &conn,
+            NewItem {
+                title: "B".to_string(),
+                day: "2026-08-28".to_string(),
+                kind: None,
+                notes: None,
+            },
+        )
+        .expect("create b");
+
+        complete_item(&conn, &a.id).expect("complete a");
+
+        let items = list_range(
+            &conn,
+            ListRange {
+                start: "2026-08-28".to_string(),
+                end: "2026-08-28".to_string(),
+            },
+        )
+        .expect("list");
+
+        assert_eq!(items[0].id, a.id);
+        assert_eq!(items[0].sort, 1);
+        assert_eq!(items[1].id, b.id);
+        assert_eq!(items[1].sort, 2);
     }
 }

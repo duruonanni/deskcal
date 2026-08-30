@@ -1,6 +1,6 @@
 [package]
 name = "deskcal"
-version = "0.1.0"
+version = "0.1.1"
 description = "桌历 - Offline-first Windows desktop calendar widget"
 authors = ["DeskCal"]
 edition = "2021"
@@ -19,6 +19,7 @@ serde_json = "1"
 rusqlite = { version = "0.32", features = ["bundled"] }
 ulid = "1"
 thiserror = "2"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "blocking"] }
 
 [target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]
 tauri-plugin-single-instance = "2"

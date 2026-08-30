@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    App, AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewWindow, WindowEvent,
+    App, AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewWindow,
+    WindowEvent,
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
@@ -20,10 +21,24 @@ use crate::AppState;
 pub const WIDGET_LABEL: &str = "widget";
 pub const SETTINGS_LABEL: &str = "settings";
 pub const LIST_LABEL: &str = "list";
+mod desktop_pin;
 const GEOMETRY_FILE: &str = "window-widget.json";
 const SAVE_DEBOUNCE_MS: u64 = 300;
-const TOP_RIGHT_MARGIN_LOGICAL: i32 = 16;
-const PLACED_TOP_RIGHT_KEY: &str = "placed_top_right_v1";
+const FRAME_IDLE_MS: u64 = 200;
+const PLACED_WIN_RIGHT_V1_KEY: &str = "placed_win_right_v1";
+
+/// Win+Right snap: right half of the work area. Odd leftover pixels stay on the right.
+pub(crate) fn snap_right_half(work: MonitorRect) -> WidgetGeometry {
+    let left_width = work.width / 2;
+    let width = (work.width - left_width).max(1);
+    let height = work.height.max(1);
+    WidgetGeometry {
+        x: work.x + left_width as i32,
+        y: work.y,
+        width,
+        height,
+    }
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct WidgetGeometry {
@@ -108,20 +123,86 @@ pub fn clamp_geometry(
     clamp_geometry_to_monitors(geometry, &rects)
 }
 
-/// Place the widget in the top-right of a monitor, with a margin from the edges.
-pub(crate) fn top_right_on_monitor(
-    monitor: MonitorRect,
-    width: u32,
-    height: u32,
-    margin: i32,
-) -> WidgetGeometry {
-    let x = (monitor.x + monitor.width as i32 - width as i32 - margin).max(monitor.x);
-    let y = monitor.y + margin;
-    WidgetGeometry {
-        x,
-        y,
-        width,
-        height,
+fn apply_win_snap_right_hwnd(hwnd: *mut std::ffi::c_void) -> Result<WidgetGeometry, String> {
+    #[repr(C)]
+    struct WinRect {
+        left: i32,
+        top: i32,
+        right: i32,
+        bottom: i32,
+    }
+    #[repr(C)]
+    struct MonitorInfo {
+        cb_size: u32,
+        rc_monitor: WinRect,
+        rc_work: WinRect,
+        dw_flags: u32,
+    }
+
+    const MONITOR_DEFAULTTONEAREST: u32 = 2;
+    const SWP_NOZORDER: u32 = 0x0004;
+    const SWP_NOACTIVATE: u32 = 0x0010;
+
+    #[link(name = "user32")]
+    extern "system" {
+        fn MonitorFromWindow(hwnd: *mut std::ffi::c_void, flags: u32) -> *mut std::ffi::c_void;
+        fn GetMonitorInfoW(hmonitor: *mut std::ffi::c_void, lpmi: *mut MonitorInfo) -> i32;
+        fn SetWindowPos(
+            hwnd: *mut std::ffi::c_void,
+            hwnd_insert_after: *mut std::ffi::c_void,
+            x: i32,
+            y: i32,
+            cx: i32,
+            cy: i32,
+            flags: u32,
+        ) -> i32;
+    }
+
+    unsafe {
+        let monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        if monitor.is_null() {
+            return Err("MonitorFromWindow failed".into());
+        }
+        let mut info = MonitorInfo {
+            cb_size: std::mem::size_of::<MonitorInfo>() as u32,
+            rc_monitor: WinRect {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            },
+            rc_work: WinRect {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            },
+            dw_flags: 0,
+        };
+        if GetMonitorInfoW(monitor, &mut info) == 0 {
+            return Err("GetMonitorInfoW failed".into());
+        }
+        let work = info.rc_work;
+        let geometry = snap_right_half(MonitorRect {
+            x: work.left,
+            y: work.top,
+            width: work.right.saturating_sub(work.left).max(0) as u32,
+            height: work.bottom.saturating_sub(work.top).max(0) as u32,
+            primary: true,
+        });
+        let ok = SetWindowPos(
+            hwnd,
+            std::ptr::null_mut(),
+            geometry.x,
+            geometry.y,
+            geometry.width as i32,
+            geometry.height as i32,
+            SWP_NOZORDER | SWP_NOACTIVATE,
+        );
+        if ok == 0 {
+            return Err("SetWindowPos failed".into());
+        }
+        Ok(geometry)
     }
 }
 
@@ -176,12 +257,14 @@ fn save_widget_geometry_now(app: &AppHandle) {
 
 struct GeometrySaveState {
     generation: AtomicU64,
+    frame_generation: AtomicU64,
 }
 
 impl Default for GeometrySaveState {
     fn default() -> Self {
         Self {
             generation: AtomicU64::new(0),
+            frame_generation: AtomicU64::new(0),
         }
     }
 }
@@ -203,6 +286,34 @@ fn schedule_widget_geometry_save(app: &AppHandle, state: &Arc<Mutex<GeometrySave
             .load(Ordering::SeqCst);
         if current == generation {
             save_widget_geometry_now(&app);
+        }
+    });
+}
+
+fn emit_widget_moving(app: &AppHandle, moving: bool) {
+    if let Some(window) = app.get_webview_window(WIDGET_LABEL) {
+        let _ = window.emit("widget-moving", moving);
+    }
+}
+
+fn schedule_widget_frame_idle(app: &AppHandle, state: &Arc<Mutex<GeometrySaveState>>) {
+    let generation = {
+        let guard = state.lock().expect("geometry save state poisoned");
+        guard.frame_generation.fetch_add(1, Ordering::SeqCst) + 1
+    };
+    emit_widget_moving(app, true);
+
+    let app = app.clone();
+    let state = Arc::clone(state);
+    thread::spawn(move || {
+        thread::sleep(Duration::from_millis(FRAME_IDLE_MS));
+        let current = state
+            .lock()
+            .expect("geometry save state poisoned")
+            .frame_generation
+            .load(Ordering::SeqCst);
+        if current == generation {
+            emit_widget_moving(&app, false);
         }
     });
 }
@@ -232,55 +343,35 @@ pub fn restore_widget_geometry(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-fn apply_top_right_placement(app: &AppHandle) -> Result<(), String> {
+fn apply_snap_right_placement(app: &AppHandle) -> Result<(), String> {
     let window = app
         .get_webview_window(WIDGET_LABEL)
         .ok_or_else(|| format!("window '{WIDGET_LABEL}' not found"))?;
-
-    let monitor = window
-        .primary_monitor()
-        .map_err(|e| format!("failed to read primary monitor: {e}"))?
-        .or(window
-            .current_monitor()
-            .map_err(|e| format!("failed to read current monitor: {e}"))?)
-        .ok_or_else(|| "no monitor available".to_string())?;
-
-    let size = window
-        .outer_size()
-        .map_err(|e| format!("failed to read widget size: {e}"))?;
-    let margin = (f64::from(TOP_RIGHT_MARGIN_LOGICAL) * monitor.scale_factor()).round() as i32;
-    let rect = MonitorRect {
-        x: monitor.position().x,
-        y: monitor.position().y,
-        width: monitor.size().width,
-        height: monitor.size().height,
-        primary: true,
-    };
-    let geometry = top_right_on_monitor(rect, size.width, size.height, margin);
-    window
-        .set_position(PhysicalPosition::new(geometry.x, geometry.y))
-        .map_err(|e| format!("failed to place widget at top-right: {e}"))?;
+    let hwnd = window
+        .hwnd()
+        .map_err(|e| format!("failed to get widget hwnd: {e}"))?;
+    apply_win_snap_right_hwnd(hwnd.0)?;
     Ok(())
 }
 
 fn place_or_restore_widget(app: &AppHandle) -> Result<(), String> {
-    let should_place_default = {
+    let should_place_win_right = {
         let state = app.state::<AppState>();
         let conn = state
             .db
             .lock()
             .map_err(|_| "database lock poisoned".to_string())?;
-        match db::get_kv(&conn, PLACED_TOP_RIGHT_KEY).map_err(|e| e.to_string())? {
+        match db::get_kv(&conn, PLACED_WIN_RIGHT_V1_KEY).map_err(|e| e.to_string())? {
             Some(_) => false,
             None => {
-                db::set_kv(&conn, PLACED_TOP_RIGHT_KEY, "1").map_err(|e| e.to_string())?;
+                db::set_kv(&conn, PLACED_WIN_RIGHT_V1_KEY, "1").map_err(|e| e.to_string())?;
                 true
             }
         }
     };
 
-    if should_place_default {
-        apply_top_right_placement(app)?;
+    if should_place_win_right {
+        apply_snap_right_placement(app)?;
         save_widget_geometry_now(app);
         return Ok(());
     }
@@ -299,6 +390,7 @@ pub fn setup_widget_geometry_persistence(app: &AppHandle) -> Result<(), String> 
     window.on_window_event(move |event| {
         if matches!(event, WindowEvent::Moved(_) | WindowEvent::Resized(_)) {
             schedule_widget_geometry_save(&app_handle, &debounce_state);
+            schedule_widget_frame_idle(&app_handle, &debounce_state);
         }
     });
 
@@ -309,6 +401,7 @@ pub fn show_widget(app: &AppHandle) -> Result<(), String> {
     let window = app
         .get_webview_window(WIDGET_LABEL)
         .ok_or_else(|| format!("window '{WIDGET_LABEL}' not found"))?;
+    desktop_pin::set_user_hidden(false);
     window
         .show()
         .map_err(|e| format!("failed to show widget: {e}"))?;
@@ -318,6 +411,7 @@ pub fn show_widget(app: &AppHandle) -> Result<(), String> {
     window
         .set_focus()
         .map_err(|e| format!("failed to focus widget: {e}"))?;
+    desktop_pin::restore_over_desktop();
     Ok(())
 }
 
@@ -325,6 +419,7 @@ pub fn hide_widget(app: &AppHandle) -> Result<(), String> {
     let window = app
         .get_webview_window(WIDGET_LABEL)
         .ok_or_else(|| format!("window '{WIDGET_LABEL}' not found"))?;
+    desktop_pin::set_user_hidden(true);
     window
         .hide()
         .map_err(|e| format!("failed to hide widget: {e}"))?;
@@ -343,10 +438,12 @@ pub fn toggle_widget_visibility(app: &AppHandle) -> Result<(), String> {
 }
 
 pub fn open_settings(app: &AppHandle) -> Result<(), String> {
+    desktop_pin::unpin();
     show_labeled_window(app, SETTINGS_LABEL)
 }
 
 pub fn open_list(app: &AppHandle) -> Result<(), String> {
+    desktop_pin::unpin();
     show_labeled_window(app, LIST_LABEL)
 }
 
@@ -484,6 +581,13 @@ pub fn setup_windows_shell(app: &App) -> Result<(), String> {
             .unwrap_or_default()
     };
 
+    if let Some(window) = app.get_webview_window(WIDGET_LABEL) {
+        let _ = window.set_shadow(false);
+        if let Ok(hwnd) = window.hwnd() {
+            desktop_pin::setup(hwnd.0);
+        }
+    }
+
     if let Err(err) = place_or_restore_widget(app.handle()) {
         eprintln!("widget placement skipped: {err}");
     }
@@ -492,6 +596,23 @@ pub fn setup_windows_shell(app: &App) -> Result<(), String> {
 
     setup_tray(app, locale).map_err(|e| e.to_string())?;
     setup_global_shortcut(app).map_err(|e| e.to_string())?;
+
+    let app_handle = app.handle().clone();
+    thread::spawn(move || {
+        if let Ok(dir) = app_handle.path().app_data_dir() {
+            let holiday_url = app_handle
+                .state::<AppState>()
+                .db
+                .lock()
+                .ok()
+                .and_then(|conn| db::get_ui_settings(&conn).ok())
+                .map(|s| s.holiday_source_url)
+                .unwrap_or_default();
+            if let Ok(cache) = crate::holidays::holidays_refresh(&dir, &holiday_url) {
+                let _ = app_handle.emit("holidays-changed", &cache.days);
+            }
+        }
+    });
 
     Ok(())
 }
@@ -544,18 +665,34 @@ mod tests {
     }
 
     #[test]
-    fn places_widget_at_top_right_with_margin() {
-        let monitor = MonitorRect {
+    fn snap_right_half_matches_win_right() {
+        let work = MonitorRect {
             x: 0,
             y: 0,
             width: 1920,
-            height: 1080,
+            height: 1040,
             primary: true,
         };
-        let geometry = top_right_on_monitor(monitor, 460, 640, 16);
-        assert_eq!(geometry.x, 1920 - 460 - 16);
-        assert_eq!(geometry.y, 16);
-        assert_eq!(geometry.width, 460);
-        assert_eq!(geometry.height, 640);
+        let geometry = snap_right_half(work);
+        assert_eq!(geometry.x, 960);
+        assert_eq!(geometry.y, 0);
+        assert_eq!(geometry.width, 960);
+        assert_eq!(geometry.height, 1040);
+    }
+
+    #[test]
+    fn snap_right_half_keeps_odd_pixel_on_the_right() {
+        let work = MonitorRect {
+            x: 1920,
+            y: 40,
+            width: 1921,
+            height: 1000,
+            primary: true,
+        };
+        let geometry = snap_right_half(work);
+        assert_eq!(geometry.width, 961);
+        assert_eq!(geometry.x, 1920 + 960);
+        assert_eq!(geometry.y, 40);
+        assert_eq!(geometry.height, 1000);
     }
 }

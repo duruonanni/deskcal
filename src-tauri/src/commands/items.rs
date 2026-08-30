@@ -101,3 +101,28 @@ pub fn items_list_incomplete(state: State<'_, AppState>) -> Result<Vec<Item>, St
     let conn = state.db.lock().map_err(|_| "database lock poisoned".to_string())?;
     db::list_incomplete(&conn).map_err(db_err_to_string)
 }
+
+#[tauri::command]
+pub fn items_uncomplete(app: AppHandle, state: State<'_, AppState>, id: String) -> Result<Item, String> {
+    let item = {
+        let conn = state.db.lock().map_err(|_| "database lock poisoned".to_string())?;
+        db::uncomplete_item(&conn, &id).map_err(db_err_to_string)?
+    };
+    emit_items_changed(&app);
+    Ok(item)
+}
+
+#[tauri::command]
+pub fn items_reorder(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    day: String,
+    ids: Vec<String>,
+) -> Result<(), String> {
+    {
+        let conn = state.db.lock().map_err(|_| "database lock poisoned".to_string())?;
+        db::reorder_items(&conn, &day, &ids).map_err(db_err_to_string)?;
+    }
+    emit_items_changed(&app);
+    Ok(())
+}

@@ -19,6 +19,7 @@ export interface CalendarItem {
   notes: string;
   day: string;
   completedAt: number | null;
+  sort: number;
   createdAt: number;
   updatedAt: number;
   deletedAt: number | null;
@@ -71,7 +72,60 @@ export async function itemsListIncomplete(): Promise<CalendarItem[]> {
   return invoke<CalendarItem[]>("items_list_incomplete");
 }
 
+/** items_uncomplete — clear completed_at on an item. */
+export async function itemsUncomplete(id: string): Promise<CalendarItem> {
+  return invoke<CalendarItem>("items_uncomplete", { id });
+}
+
+/** items_reorder — set sort order for items on a single day. */
+export async function itemsReorder(day: string, ids: string[]): Promise<void> {
+  return invoke<void>("items_reorder", { day, ids });
+}
+
+export type HolidayKind = "rest" | "work";
+
+export interface HolidayDay {
+  kind: HolidayKind;
+  name: string;
+}
+
+export interface HolidaysPayload {
+  days: Record<string, HolidayDay>;
+}
+
+export interface HolidaysStatus {
+  sourceUrl: string;
+  fetchedAt: string | null;
+  usingCache: boolean;
+  usingBundle: boolean;
+}
+
+export async function holidaysGet(): Promise<HolidaysPayload> {
+  return invoke<HolidaysPayload>("holidays_get");
+}
+
+export async function holidaysRefresh(): Promise<HolidaysPayload> {
+  return invoke<HolidaysPayload>("holidays_refresh");
+}
+
+export async function holidaysStatus(): Promise<HolidaysStatus> {
+  return invoke<HolidaysStatus>("holidays_status");
+}
+
+export function onHolidaysChanged(
+  handler: (days: Record<string, HolidayDay>) => void,
+): Promise<UnlistenFn> {
+  return listen<Record<string, HolidayDay>>("holidays-changed", (event) =>
+    handler(event.payload),
+  );
+}
+
 export type ThemeMode = "auto" | "light" | "dark";
+
+export type WeekNumberMode = "iso" | "remaining";
+
+export const BUILTIN_HOLIDAY_URL_TEMPLATE =
+  "https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/{year}.json";
 
 export interface UiSettings {
   widgetOpacity: number;
@@ -80,15 +134,19 @@ export interface UiSettings {
   locale: AppLocale;
   widgetLocked: boolean;
   themeMode: ThemeMode;
+  weekNumberMode: WeekNumberMode;
+  holidaySourceUrl: string;
 }
 
 export const DEFAULT_UI_SETTINGS: UiSettings = {
-  widgetOpacity: 0.25,
+  widgetOpacity: 0.85,
   showTitlesInCells: false,
-  textOutline: true,
+  textOutline: false,
   locale: "zh",
   widgetLocked: false,
   themeMode: "auto",
+  weekNumberMode: "iso",
+  holidaySourceUrl: "",
 };
 
 export async function settingsGet(): Promise<UiSettings> {
@@ -112,6 +170,10 @@ export function onSettingsChanged(
 
 export function onItemsChanged(handler: () => void): Promise<UnlistenFn> {
   return listen("items-changed", () => handler());
+}
+
+export function onWidgetMoving(handler: (moving: boolean) => void): Promise<UnlistenFn> {
+  return listen<boolean>("widget-moving", (event) => handler(event.payload));
 }
 
 export async function widgetStartDragging(): Promise<void> {

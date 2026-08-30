@@ -7,7 +7,7 @@ Offline-first Windows desktop calendar widget. Click a day to jot tasks, with Ch
 | **Type** | Personal (open-source intent, MIT) |
 | **Platform** | Windows 10/11 |
 | **Stage** | V0 — local widget + SQLite |
-| **Version SSOT** | `package.json` `"version"` |
+| **Version SSOT** | `package.json` `"version"` (bump with `npm run version:bump` before each commit; settings shows it) |
 
 Inspired by DesktopCal / CalendarTask, not a clone. Optional AI (BYOK) and Bring-Your-Own-folder sync are **stubs in V0**.
 
@@ -43,7 +43,7 @@ cd src-tauri; cargo test
 
 SQLite path: `%APPDATA%\dev.deskcal.app\app.db` — never put the live DB in OneDrive / iCloud Drive.
 
-- Global hotkey: `Ctrl+Shift+C` captures to today. Tray left-click toggles the widget. Header **锁定/解锁** (or Lock/Unlock) controls dragging; first launch after v0.1 layout sits at the **top-right**. Language is **设置 → 语言**.
+- Global hotkey: `Ctrl+Shift+C` captures to today. Tray left-click toggles the widget. Header **锁定/解锁** (or Lock/Unlock) controls dragging; first launch fills the **right half of the primary work area** (`Win+→`). Language is **设置 → 语言**.
 
 ## Structure
 
@@ -51,6 +51,7 @@ SQLite path: `%APPDATA%\dev.deskcal.app\app.db` — never put the live DB in One
 - `src-tauri/` — SQLite, IPC commands, Windows tray/hotkey
 - `DECISIONS.md` — locked product/tech choices
 - `SESSION_HANDOFF.md` — current state for the next session
+- Figma (optional, drafts): https://www.figma.com/design/8IVe6sQ0nL4oIxmmx1CIQj
 
 ## Next step
 

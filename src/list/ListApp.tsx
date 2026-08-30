@@ -11,7 +11,7 @@ import {
   settingsGet,
 } from "../services/tauriCommands";
 import { documentLang, t } from "../i18n/messages";
-import { useDeskCalTheme } from "../theme/useDeskCalTheme";
+import { useSettingsChromeTheme } from "../theme/useSettingsChromeTheme";
 
 export default function ListApp() {
   const [items, setItems] = useState<CalendarItem[]>([]);
@@ -19,7 +19,7 @@ export default function ListApp() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const locale = ui.locale ?? "zh";
-  useDeskCalTheme(ui);
+  useSettingsChromeTheme();
 
   async function load() {
     try {

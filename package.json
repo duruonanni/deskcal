@@ -1,6 +1,6 @@
 {
   "name": "deskcal",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/with-windows-build-env.ps1",
-    "test": "vitest run"
+    "test": "vitest run",
+    "version:bump": "node scripts/bump-version.mjs",
+    "version:sync": "node scripts/sync-version.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.8.0",

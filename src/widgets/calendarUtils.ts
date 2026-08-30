@@ -98,3 +98,130 @@ export function truncateTitle(title: string, maxLen = 10): string {
   if (trimmed.length <= maxLen) return trimmed;
   return `${trimmed.slice(0, maxLen)}…`;
 }
+
+/** ISO day-of-week: Monday = 1 … Sunday = 7. */
+function isoDayOfWeek(date: Date): number {
+  const d = date.getDay();
+  return d === 0 ? 7 : d;
+}
+
+/** ISO week number (week containing Thursday; weeks start Monday). */
+export function isoWeek(date: Date): number {
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = isoDayOfWeek(target);
+  target.setDate(target.getDate() + 4 - day);
+  const isoYear = target.getFullYear();
+  const jan4 = new Date(isoYear, 0, 4);
+  const jan4Iso = isoDayOfWeek(jan4);
+  const mondayWeek1 = new Date(isoYear, 0, 4 - jan4Iso + 1);
+  const diffDays = Math.round((target.getTime() - mondayWeek1.getTime()) / 86_400_000);
+  return Math.floor(diffDays / 7) + 1;
+}
+
+/** Number of ISO weeks in a calendar year (52 or 53). */
+export function isoWeeksInYear(year: number): 52 | 53 {
+  return isoWeek(new Date(year, 11, 28)) === 53 ? 53 : 52;
+}
+
+/** ISO weeks remaining after the current week (0 in the last ISO week of the year). */
+export function weeksRemainingInYear(date: Date): number {
+  const y = date.getFullYear();
+  return isoWeeksInYear(y) - isoWeek(date);
+}
+
+function isoWeekMonday(date: Date): Date {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = isoDayOfWeek(d);
+  d.setDate(d.getDate() + 1 - day);
+  return d;
+}
+
+export interface RollingWeekGridData {
+  start: string;
+  end: string;
+  weeks: (Date | null)[][];
+}
+
+/**
+ * Rolling ~4-week Monday-first grid from (today's ISO Monday − 7).
+ * Rows split on calendar month change; empty slots are null.
+ * Today's week is always row 1 when the span is built from real today.
+ */
+export function buildRollingWeekGrid(today: Date): RollingWeekGridData {
+  const currentMonday = isoWeekMonday(today);
+  const walkStart = new Date(currentMonday);
+  walkStart.setDate(currentMonday.getDate() - 7);
+
+  const walkEnd = new Date(walkStart);
+  walkEnd.setDate(walkStart.getDate() + 27);
+
+  const weeks: (Date | null)[][] = [];
+  let currentRow: (Date | null)[] = [];
+  let day = new Date(walkStart);
+  let prevMonth = day.getMonth();
+
+  while (day <= walkEnd) {
+    const month = day.getMonth();
+    if (currentRow.length > 0 && month !== prevMonth) {
+      while (currentRow.length < 7) {
+        currentRow.push(null);
+      }
+      weeks.push(currentRow);
+      currentRow = [];
+    }
+
+    if (currentRow.length === 0) {
+      const leading = isoDayOfWeek(day) - 1;
+      for (let i = 0; i < leading; i++) {
+        currentRow.push(null);
+      }
+    }
+
+    currentRow.push(new Date(day));
+    prevMonth = month;
+    day.setDate(day.getDate() + 1);
+
+    if (currentRow.length === 7) {
+      weeks.push(currentRow);
+      currentRow = [];
+    }
+  }
+
+  if (currentRow.length > 0) {
+    while (currentRow.length < 7) {
+      currentRow.push(null);
+    }
+    weeks.push(currentRow);
+  }
+
+  let start: string | null = null;
+  let end: string | null = null;
+  for (const week of weeks) {
+    for (const cell of week) {
+      if (!cell) continue;
+      const dayStr = formatDay(cell);
+      if (!start) start = dayStr;
+      end = dayStr;
+    }
+  }
+
+  return {
+    start: start ?? formatDay(walkStart),
+    end: end ?? formatDay(walkEnd),
+    weeks,
+  };
+}
+
+const HEADER_WEEKDAY_ZH = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"] as const;
+
+export function headerDateLabel(date: Date, locale: "zh" | "en"): string {
+  const y = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  if (locale === "zh") {
+    return `${y}年${m}月${d}日 ${HEADER_WEEKDAY_ZH[date.getDay()]}`;
+  }
+  const weekday = WEEKDAY_EN_SHORT[date.getDay()];
+  const month = MONTHS_EN[date.getMonth()].slice(0, 3);
+  return `${weekday}, ${month} ${d}, ${y}`;
+}
