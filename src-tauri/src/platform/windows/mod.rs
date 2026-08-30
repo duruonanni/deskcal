@@ -297,6 +297,56 @@ fn emit_widget_moving(app: &AppHandle, moving: bool) {
     }
 }
 
+fn ensure_widget_desktop_pin(window: &WebviewWindow) {
+    match window.hwnd() {
+        Ok(hwnd) => desktop_pin::setup(hwnd.0),
+        Err(e) => eprintln!("deskcal: widget hwnd not ready for desktop pin: {e}"),
+    }
+}
+
+fn auxiliary_window_has_focus(app: &AppHandle) -> bool {
+    for label in [SETTINGS_LABEL, LIST_LABEL] {
+        if let Some(window) = app.get_webview_window(label) {
+            if window.is_visible().unwrap_or(false) && window.is_focused().unwrap_or(false) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn schedule_widget_restore_on_blur(app: &AppHandle) {
+    if desktop_pin::user_hidden() {
+        return;
+    }
+    let app = app.clone();
+    thread::spawn(move || {
+        thread::sleep(Duration::from_millis(80));
+        if desktop_pin::user_hidden() || auxiliary_window_has_focus(&app) {
+            return;
+        }
+        if let Some(window) = app.get_webview_window(WIDGET_LABEL) {
+            if !window.is_visible().unwrap_or(false) {
+                let _ = window.show();
+            }
+            ensure_widget_desktop_pin(&window);
+        }
+        desktop_pin::restore_over_desktop();
+    });
+}
+
+fn schedule_desktop_pin_retries(app: &AppHandle) {
+    let app = app.clone();
+    thread::spawn(move || {
+        for delay in [150_u64, 500, 1500] {
+            thread::sleep(Duration::from_millis(delay));
+            if let Some(window) = app.get_webview_window(WIDGET_LABEL) {
+                ensure_widget_desktop_pin(&window);
+            }
+        }
+    });
+}
+
 fn schedule_widget_frame_idle(app: &AppHandle, state: &Arc<Mutex<GeometrySaveState>>) {
     let generation = {
         let guard = state.lock().expect("geometry save state poisoned");
@@ -389,11 +439,33 @@ pub fn setup_widget_geometry_persistence(app: &AppHandle) -> Result<(), String> 
     let debounce_state = save_state.clone();
     let app_handle = app.clone();
     window.on_window_event(move |event| {
-        if matches!(event, WindowEvent::Moved(_) | WindowEvent::Resized(_)) {
-            schedule_widget_geometry_save(&app_handle, &debounce_state);
-            schedule_widget_frame_idle(&app_handle, &debounce_state);
+        match event {
+            WindowEvent::Moved(_) | WindowEvent::Resized(_) => {
+                schedule_widget_geometry_save(&app_handle, &debounce_state);
+                schedule_widget_frame_idle(&app_handle, &debounce_state);
+            }
+            WindowEvent::Focused(false) => schedule_widget_restore_on_blur(&app_handle),
+            WindowEvent::Focused(true) => {
+                if let Some(window) = app_handle.get_webview_window(WIDGET_LABEL) {
+                    ensure_widget_desktop_pin(&window);
+                }
+            }
+            _ => {}
         }
     });
+
+    for label in [SETTINGS_LABEL, LIST_LABEL] {
+        let window = app
+            .get_webview_window(label)
+            .ok_or_else(|| format!("window '{label}' not found"))?;
+        window.on_window_event(move |event| {
+            if matches!(event, WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed) {
+                if !desktop_pin::user_hidden() {
+                    desktop_pin::restore_over_desktop();
+                }
+            }
+        });
+    }
 
     Ok(())
 }
@@ -403,6 +475,7 @@ pub fn show_widget(app: &AppHandle) -> Result<(), String> {
         .get_webview_window(WIDGET_LABEL)
         .ok_or_else(|| format!("window '{WIDGET_LABEL}' not found"))?;
     desktop_pin::set_user_hidden(false);
+    ensure_widget_desktop_pin(&window);
     window
         .show()
         .map_err(|e| format!("failed to show widget: {e}"))?;
@@ -584,9 +657,8 @@ pub fn setup_windows_shell(app: &App) -> Result<(), String> {
 
     if let Some(window) = app.get_webview_window(WIDGET_LABEL) {
         let _ = window.set_shadow(false);
-        if let Ok(hwnd) = window.hwnd() {
-            desktop_pin::setup(hwnd.0);
-        }
+        ensure_widget_desktop_pin(&window);
+        schedule_desktop_pin_retries(app.handle());
     }
 
     if let Err(err) = place_or_restore_widget(app.handle()) {

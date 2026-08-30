@@ -11,11 +11,13 @@ static USER_HIDDEN: AtomicBool = AtomicBool::new(false);
 static WIDGET_HWND: AtomicIsize = AtomicIsize::new(0);
 static ORIG_WNDPROC: AtomicIsize = AtomicIsize::new(0);
 static HOOK: AtomicIsize = AtomicIsize::new(0);
+static PIN_READY: AtomicBool = AtomicBool::new(false);
 
 const EVENT_SYSTEM_FOREGROUND: u32 = 0x0003;
 const WINEVENT_OUTOFCONTEXT: u32 = 0;
 const GWLP_WNDPROC: i32 = -4;
 const WM_WINDOWPOSCHANGING: u32 = 0x0046;
+const WM_SHOWWINDOW: u32 = 0x0018;
 const WM_SYSCOMMAND: u32 = 0x0112;
 const SC_MINIMIZE: usize = 0xF020;
 const SWP_NOMOVE: u32 = 0x0002;
@@ -23,6 +25,7 @@ const SWP_NOSIZE: u32 = 0x0001;
 const SWP_NOACTIVATE: u32 = 0x0010;
 const SWP_HIDEWINDOW: u32 = 0x0080;
 const HWND_TOP: isize = 0;
+const HWND_BOTTOM: isize = 1;
 const HWND_NOTOPMOST: isize = -2;
 const SW_SHOWNA: i32 = 8;
 const SHOW_DESKTOP_SENTINEL: i32 = -16000;
@@ -99,12 +102,20 @@ pub fn setup(hwnd: *mut std::ffi::c_void) {
     if hwnd.is_null() {
         return;
     }
-    WIDGET_HWND.store(hwnd as isize, Ordering::SeqCst);
+    let hwnd_id = hwnd as isize;
+    if WIDGET_HWND.load(Ordering::SeqCst) == hwnd_id && PIN_READY.load(Ordering::SeqCst) {
+        return;
+    }
+    WIDGET_HWND.store(hwnd_id, Ordering::SeqCst);
 
     unsafe {
         let prev = SetWindowLongPtrW(hwnd, GWLP_WNDPROC, widget_wnd_proc as *const () as isize);
         if prev != 0 {
             ORIG_WNDPROC.store(prev, Ordering::SeqCst);
+            PIN_READY.store(true, Ordering::SeqCst);
+        } else {
+            eprintln!("deskcal: desktop pin wndproc subclass failed");
+            PIN_READY.store(false, Ordering::SeqCst);
         }
         if HOOK.load(Ordering::SeqCst) == 0 {
             let hook = SetWinEventHook(
@@ -116,7 +127,11 @@ pub fn setup(hwnd: *mut std::ffi::c_void) {
                 0,
                 WINEVENT_OUTOFCONTEXT,
             );
-            HOOK.store(hook as isize, Ordering::SeqCst);
+            if hook.is_null() {
+                eprintln!("deskcal: desktop pin foreground hook failed");
+            } else {
+                HOOK.store(hook as isize, Ordering::SeqCst);
+            }
         }
     }
 }
@@ -161,7 +176,12 @@ fn set_widget_zorder(insert_after: isize, show: bool) {
 pub(crate) fn is_desktop_class_name(name: &str) -> bool {
     matches!(
         name,
-        "Progman" | "WorkerW" | "SHELLDLL_DefView" | "XamlExplorerHostIslandWindow"
+        "Progman"
+            | "WorkerW"
+            | "SHELLDLL_DefView"
+            | "XamlExplorerHostIslandWindow"
+            | "SysListView32"
+            | "FolderView"
     )
 }
 
@@ -219,6 +239,9 @@ unsafe extern "system" fn widget_wnd_proc(
     lparam: isize,
 ) -> isize {
     if !user_hidden() {
+        if msg == WM_SHOWWINDOW && wparam == 0 {
+            return 0;
+        }
         if msg == WM_SYSCOMMAND && (wparam & 0xFFF0) == SC_MINIMIZE {
             return 0;
         }
@@ -229,6 +252,9 @@ unsafe extern "system" fn widget_wnd_proc(
             }
             if pos.flags & SWP_HIDEWINDOW != 0 {
                 pos.flags &= !SWP_HIDEWINDOW;
+            }
+            if pos.hwnd_insert_after as isize == HWND_BOTTOM {
+                pos.hwnd_insert_after = HWND_TOP as *mut std::ffi::c_void;
             }
         }
     }
@@ -249,6 +275,8 @@ mod tests {
         assert!(is_desktop_class_name("WorkerW"));
         assert!(is_desktop_class_name("SHELLDLL_DefView"));
         assert!(is_desktop_class_name("XamlExplorerHostIslandWindow"));
+        assert!(is_desktop_class_name("SysListView32"));
+        assert!(is_desktop_class_name("FolderView"));
         assert!(!is_desktop_class_name("Chrome_WidgetWin_1"));
         assert!(!is_desktop_class_name("Shell_TrayWnd"));
     }
