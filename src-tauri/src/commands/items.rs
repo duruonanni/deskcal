@@ -19,7 +19,12 @@ pub fn items_list_range(
     end: String,
 ) -> Result<Vec<Item>, String> {
     let conn = state.db.lock().map_err(|_| "database lock poisoned".to_string())?;
-    db::list_range(&conn, ListRange { start, end }).map_err(db_err_to_string)
+    let result = db::list_range(&conn, ListRange { start: start.clone(), end: end.clone() })
+        .map_err(db_err_to_string);
+    if let Err(ref err) = result {
+        eprintln!("deskcal: items_list_range failed ({start}..{end}): {err}");
+    }
+    result
 }
 
 #[tauri::command]

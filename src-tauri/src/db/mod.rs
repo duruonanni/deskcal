@@ -590,4 +590,30 @@ mod tests {
         assert_eq!(items[1].id, b.id);
         assert_eq!(items[1].sort, 2);
     }
+
+    #[test]
+    fn user_db_list_range_serializes() {
+        let Ok(appdata) = std::env::var("APPDATA") else {
+            return;
+        };
+        let path = std::path::PathBuf::from(appdata)
+            .join("dev.deskcal.app")
+            .join("app.db");
+        if !path.exists() {
+            return;
+        }
+
+        let conn = open(&path).expect("open user db");
+        let items = list_range(
+            &conn,
+            ListRange {
+                start: "2026-08-17".to_string(),
+                end: "2026-09-13".to_string(),
+            },
+        )
+        .expect("list range on user db");
+        let json = serde_json::to_string(&items).expect("serialize items");
+        assert!(!json.is_empty());
+        println!("user db items json: {json}");
+    }
 }

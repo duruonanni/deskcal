@@ -9,6 +9,27 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import type { AppLocale } from "../i18n/messages";
 
+const IPC_RETRY_DELAYS_MS = [0, 200, 600];
+
+async function invokeWithRetry<T>(
+  cmd: string,
+  args?: Record<string, unknown>,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < IPC_RETRY_DELAYS_MS.length; attempt++) {
+    const delay = IPC_RETRY_DELAYS_MS[attempt];
+    if (delay > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+    try {
+      return await invoke<T>(cmd, args);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
 export type ItemKind = "task" | "note" | "event";
 
 /** Calendar item — mirrors Rust `domain::Item` (camelCase JSON). */
@@ -45,7 +66,7 @@ export async function itemsListRange(
   start: string,
   end: string,
 ): Promise<CalendarItem[]> {
-  return invoke<CalendarItem[]>("items_list_range", { start, end });
+  return invokeWithRetry<CalendarItem[]>("items_list_range", { start, end });
 }
 
 /** items_create — create a new calendar item. */

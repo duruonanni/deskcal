@@ -114,8 +114,14 @@ export default function WidgetApp() {
       setError(null);
       const data = await itemsListRange(grid.start, grid.end);
       setItems(data);
-    } catch {
-      setError(t(locale, "loadItemsFailed"));
+    } catch (err) {
+      console.error("loadItems failed", err);
+      const detail = err instanceof Error ? err.message : String(err);
+      setError(
+        import.meta.env.DEV
+          ? `${t(locale, "loadItemsFailed")} (${detail})`
+          : t(locale, "loadItemsFailed"),
+      );
     }
   }, [grid.start, grid.end, locale]);
 

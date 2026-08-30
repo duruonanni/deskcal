@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tauri::{
+    image::Image,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     App, AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewWindow,
@@ -457,9 +458,9 @@ fn show_labeled_window(app: &AppHandle, label: &str) -> Result<(), String> {
     window
         .unminimize()
         .map_err(|e| format!("failed to unminimize {label}: {e}"))?;
-    window
-        .set_focus()
-        .map_err(|e| format!("failed to focus {label}: {e}"))?;
+    if let Err(e) = window.set_focus() {
+        eprintln!("deskcal: focus {label} skipped (window is still shown): {e}");
+    }
     Ok(())
 }
 
@@ -506,18 +507,18 @@ pub fn refresh_tray_locale(app: &AppHandle, locale: AppLocale) {
     let _ = tray.set_tooltip(Some(tip));
 }
 
+fn tray_icon() -> Image<'static> {
+    Image::from_bytes(include_bytes!("../../../icons/tray-icon.png"))
+        .expect("tray-icon.png missing; run scripts/generate-icons.py")
+}
+
 pub fn setup_tray(app: &App, locale: AppLocale) -> Result<(), Box<dyn std::error::Error>> {
     let handle = app.handle();
     let menu = build_tray_menu(handle, locale)?;
     let [_, _, _, _, tip] = tray_copy(locale);
 
-    let icon = app
-        .default_window_icon()
-        .cloned()
-        .ok_or("missing default window icon")?;
-
     TrayIconBuilder::with_id("deskcal-tray")
-        .icon(icon)
+        .icon(tray_icon())
         .tooltip(tip)
         .menu(&menu)
         .show_menu_on_left_click(false)
